@@ -1,0 +1,1966 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SQL优化100 - 从入门到高难</title>
+<style>
+:root { --primary:#1a73e8; --primary-dark:#1557b0; --secondary:#34a853; --danger:#ea4335; --warning:#fbbc04; --bg:#f8f9fa; --card-bg:#fff; --text:#202124; --text-secondary:#5f6368; --border:#dadce0; --easy:#34a853; --medium:#fbbc04; --hard:#ea4335; --shadow:0 1px 2px 0 rgba(60,64,67,.1),0 1px 3px 1px rgba(60,64,67,.08); --shadow-hover:0 1px 3px 0 rgba(60,64,67,.15),0 4px 8px 3px rgba(60,64,67,.1); }
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif; background:var(--bg); color:var(--text); line-height:1.6; }
+.header { background:linear-gradient(135deg,var(--primary) 0%,var(--primary-dark) 100%); color:white; padding:24px 32px; position:fixed; top:0; left:0; right:0; z-index:1000; box-shadow:0 2px 8px rgba(0,0,0,.15); }
+.header h1 { font-size:24px; font-weight:600; }
+.header p { opacity:.9; margin-top:4px; font-size:14px; }
+.search-box { position:fixed; top:16px; right:32px; z-index:1001; }
+.search-box input { padding:8px 16px; border:none; border-radius:20px; width:280px; font-size:14px; outline:none; background:rgba(255,255,255,.95); color:var(--text); }
+.container { display:flex; margin-top:90px; min-height:calc(100vh - 90px); }
+.sidebar { width:260px; background:var(--card-bg); border-right:1px solid var(--border); position:fixed; top:90px; bottom:0; overflow-y:auto; padding:16px 0; z-index:100; }
+.sidebar-title { padding:8px 20px; font-size:12px; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.5px; }
+.nav-item { padding:10px 20px 10px 28px; cursor:pointer; font-size:14px; border-left:3px solid transparent; transition:all .2s; display:flex; align-items:center; gap:8px; }
+.nav-item:hover { background:#f1f3f4; }
+.nav-item.active { background:#e8f0fe; border-left-color:var(--primary); color:var(--primary); font-weight:500; }
+.nav-item .badge { font-size:11px; padding:2px 8px; border-radius:10px; margin-left:auto; }
+.badge-easy { background:#e6f4ea; color:var(--easy); }
+.badge-medium { background:#fef3e8; color:#b06000; }
+.badge-hard { background:#fce8e6; color:var(--danger); }
+.content { margin-left:260px; flex:1; padding:24px 32px; max-width:calc(100% - 260px); }
+.section-title { font-size:22px; font-weight:600; margin-bottom:20px; padding-bottom:12px; border-bottom:2px solid var(--border); display:flex; align-items:center; gap:10px; }
+.case-card { background:var(--card-bg); border-radius:12px; box-shadow:var(--shadow); margin-bottom:16px; overflow:hidden; transition:box-shadow .2s; }
+.case-card:hover { box-shadow:var(--shadow-hover); }
+.case-header { padding:16px 20px; cursor:pointer; display:flex; align-items:center; gap:12px; user-select:none; }
+.case-number { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:700; color:white; flex-shrink:0; }
+.case-num-easy { background:var(--easy); }
+.case-num-medium { background:var(--medium); color:#333; }
+.case-num-hard { background:var(--danger); }
+.case-title-wrap { flex:1; }
+.case-title { font-size:15px; font-weight:600; color:var(--text); }
+.case-subtitle { font-size:12px; color:var(--text-secondary); margin-top:2px; }
+.case-level { font-size:11px; padding:3px 10px; border-radius:12px; font-weight:500; }
+.level-easy { background:#e6f4ea; color:#137333; }
+.level-medium { background:#fef3e8; color:#b06000; }
+.level-hard { background:#fce8e6; color:#c5221f; }
+.case-toggle { font-size:20px; color:var(--text-secondary); transition:transform .2s; }
+.case-toggle.open { transform:rotate(90deg); }
+.case-body { max-height:0; overflow:hidden; transition:max-height .3s ease-out; }
+.case-body.open { max-height:3000px; transition:max-height .5s ease-in; }
+.case-content { padding:0 20px 20px 68px; }
+.content-block { margin-bottom:16px; }
+.content-block h4 { font-size:13px; font-weight:600; color:var(--primary); margin-bottom:6px; display:flex; align-items:center; gap:6px; }
+.content-block p,.content-block li { font-size:13px; color:var(--text-secondary); line-height:1.8; }
+.content-block ul { padding-left:18px; }
+.code-block { background:#1e1e1e; color:#d4d4d4; padding:14px 16px; border-radius:8px; font-family:'Consolas','Monaco',monospace; font-size:12px; overflow-x:auto; margin:8px 0; line-height:1.6; }
+.highlight-box { background:#e8f0fe; border-left:4px solid var(--primary); padding:12px 16px; border-radius:0 8px 8px 0; margin:10px 0; font-size:13px; }
+.step-list { counter-reset:step; padding-left:0; list-style:none; }
+.step-list li { position:relative; padding-left:32px; margin-bottom:10px; }
+.step-list li::before { counter-increment:step; content:counter(step); position:absolute; left:0; top:0; width:22px; height:22px; background:var(--primary); color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:600; }
+.back-to-top { position:fixed; bottom:32px; right:32px; width:44px; height:44px; background:var(--primary); color:white; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 8px rgba(0,0,0,.2); font-size:20px; transition:all .2s; z-index:999; }
+.back-to-top:hover { background:var(--primary-dark); transform:translateY(-2px); }
+.no-result { text-align:center; padding:60px; color:var(--text-secondary); }
+::-webkit-scrollbar { width:6px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:#c1c1c1; border-radius:3px; }
+</style>
+</head>
+<body>
+<div class="header"><h1>SQL优化100</h1><p>从入门到高难 —— 真实业务场景下的SQL优化全流程实战</p></div>
+<div class="search-box"><input type="text" id="searchInput" placeholder="搜索问题、关键词..."></div>
+<div class="container">
+<div class="sidebar">
+<div class="sidebar-title">导航</div>
+<div class="nav-item active" onclick="scrollToSection('easy')"><span>入门篇 (1-30)</span><span class="badge badge-easy">30</span></div>
+<div class="nav-item" onclick="scrollToSection('medium')"><span>进阶篇 (31-60)</span><span class="badge badge-medium">30</span></div>
+<div class="nav-item" onclick="scrollToSection('hard')"><span>高难篇 (61-100)</span><span class="badge badge-hard">40</span></div>
+<div style="border-top:1px solid var(--border);margin:12px 0;"></div>
+<div class="sidebar-title">快速跳转</div>
+<div class="nav-item" onclick="scrollToSection('easy')">索引优化</div>
+<div class="nav-item" onclick="scrollToSection('medium')">查询重构</div>
+<div class="nav-item" onclick="scrollToSection('hard')">架构级优化</div>
+</div>
+<div class="content" id="contentArea">
+
+<!-- ==================== 入门篇 (1-30) ==================== -->
+<div class="section-title" id="easy"><span style="font-size:26px;margin-right:6px;">🌱</span>入门篇 (1-30) —— 索引与基础查询优化</div>
+
+<!-- 案例1 -->
+<div class="case-card" data-keywords="索引失效 函数 左模糊 like">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">1</div>
+<div class="case-title-wrap"><div class="case-title">索引列上使用函数导致索引失效</div><div class="case-subtitle">电商订单查询 — 日期函数使索引无法命中</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>某电商平台查询2024年1月的所有订单，订单表orders有500万数据，created_at字段建有普通索引。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM orders WHERE YEAR(created_at) = 2024 AND MONTH(created_at) = 1;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>运维反馈该查询慢，高峰期CPU飙高</li><li>EXPLAIN查看执行计划，type为ALL（全表扫描），key为NULL</li><li>500万数据全表扫描，耗时3.2秒</li></ul></div>
+<div class="content-block"><h4>💡 根因分析</h4><div class="highlight-box">对索引列使用YEAR()/MONTH()函数后，MySQL无法直接使用索引，因为索引存储的是原始值，不是函数计算后的值。</div></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1（推荐）：改写为范围查询</strong></p><div class="code-block">SELECT * FROM orders WHERE created_at >= '2024-01-01' AND created_at < '2024-02-01';</div><p><strong>方法2：使用函数索引（MySQL 8.0+）</strong></p><div class="code-block">CREATE INDEX idx_year_month ON orders ((YEAR(created_at)), (MONTH(created_at)));</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>type变为range，命中idx_created_at索引</li><li>扫描行数从500万降至1.2万</li><li>查询耗时从3.2秒降至12ms</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例2 -->
+<div class="case-card" data-keywords="左模糊 like 前缀匹配 索引">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">2</div>
+<div class="case-title-wrap"><div class="case-title">LIKE左模糊导致索引失效</div><div class="case-subtitle">用户搜索 — 手机号尾号查询全表扫描</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>CRM系统支持按手机号尾号查找用户，用户输入"*8888"查找尾号为8888的客户。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM users WHERE phone LIKE '%8888';</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>客服反馈搜索功能卡顿，经常超时</li><li>EXPLAIN显示Extra为Using where，type=ALL</li><li>phone字段有索引，但LIKE以%开头无法使用索引</li></ul></div>
+<div class="content-block"><h4>💡 根因分析</h4><div class="highlight-box">B+树索引按前缀有序存储，'%xxx'左模糊无法确定扫描起点，只能全表扫描。</div></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：反向存储+前缀匹配（推荐）</strong></p><div class="code-block">ALTER TABLE users ADD phone_reverse VARCHAR(20);
+UPDATE users SET phone_reverse = REVERSE(phone);
+CREATE INDEX idx_phone_reverse ON users(phone_reverse);
+-- 查询改为
+SELECT * FROM users WHERE phone_reverse LIKE REVERSE('8888') || '%';</div><p><strong>方法2：使用Elasticsearch等搜索引擎</strong></p><p><strong>方法3：限制最小匹配长度+覆盖索引</strong></p><div class="code-block">SELECT * FROM users WHERE phone LIKE '138%8888';</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>采用反向存储方案后，查询命中索引</li><li>耗时从2.8秒降至15ms</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例3 -->
+<div class="case-card" data-keywords="隐式转换 类型转换 索引失效">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">3</div>
+<div class="case-title-wrap"><div class="case-title">隐式类型转换导致索引失效</div><div class="case-subtitle">会员查询 — 字符串ID传入数字</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>会员表member_id为VARCHAR类型，Java代码中误用Long类型传入，导致隐式转换。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM members WHERE member_id = 123456;  -- member_id是VARCHAR</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>该查询偶尔快偶尔慢，不规律</li><li>EXPLAIN发现type=ALL，未走索引</li><li>查看warnings发现隐式转换：CAST(member_id AS DECIMAL)</li></ul></div>
+<div class="content-block"><h4>💡 根因分析</h4><div class="highlight-box">当比较两边类型不一致时，MySQL会自动将字符串转为数字。这相当于对索引列使用了函数(CAST)，导致索引失效。</div></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：传入正确类型（推荐）</strong></p><div class="code-block">SELECT * FROM members WHERE member_id = '123456';</div><p><strong>方法2：修改表字段类型（需谨慎评估）</strong></p><div class="code-block">ALTER TABLE members MODIFY member_id BIGINT;</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>传入字符串后，type=ref，命中索引</li><li>查询从1.5秒降至2ms</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例4 -->
+<div class="case-card" data-keywords="or条件 索引 union">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">4</div>
+<div class="case-title-wrap"><div class="case-title">OR条件导致索引无法命中</div><div class="case-subtitle">订单查询 — 多条件OR查询全表扫描</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>查询"订单状态为已支付 或 创建时间在今天"的订单，两个字段分别有独立索引。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM orders WHERE status = 'paid' OR created_at >= CURDATE();</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>运营后台查询超时</li><li>EXPLAIN显示type=ALL，possible_keys有两个但key=NULL</li><li>MySQL优化器无法同时使用两个单列索引的OR条件</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：改写为UNION（推荐）</strong></p><div class="code-block">SELECT * FROM orders WHERE status = 'paid'
+UNION ALL
+SELECT * FROM orders WHERE created_at >= CURDATE() AND status != 'paid';</div><p><strong>方法2：建立复合索引</strong></p><div class="code-block">CREATE INDEX idx_status_created ON orders(status, created_at);</div><p><strong>方法3：使用INDEX_MERGE（MySQL 5.6+）</strong></p><div class="code-block">SELECT /*+ INDEX_MERGE(orders idx_status, idx_created) */ * FROM orders ...</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>UNION改写后分别命中两个索引</li><li>总扫描行数大幅减少</li><li>查询从4秒降至80ms</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例5 -->
+<div class="case-card" data-keywords="select * 覆盖索引 回表">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">5</div>
+<div class="case-title-wrap"><div class="case-title">SELECT * 导致回表查询</div><div class="case-subtitle">商品列表 — 只需要名称和价格却查全字段</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>商品列表页展示商品名称和价格，但SQL写成了SELECT *，商品表有30多个字段（描述、详情等大字段）。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM products WHERE category_id = 100 LIMIT 20;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>商品列表页加载慢，网络传输量大</li><li>EXPLAIN显示Using where，Extra无覆盖索引标识</li><li>抓包发现单次查询返回数据量达500KB</li></ul></div>
+<div class="content-block"><h4>💡 根因分析</h4><div class="highlight-box">SELECT * 会读取所有字段，即使只需要2个字段。若存在大字段(TEXT/BLOB)，会触发回表并增加大量IO和网络开销。</div></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：只查需要的字段（推荐）</strong></p><div class="code-block">SELECT product_name, price FROM products WHERE category_id = 100 LIMIT 20;</div><p><strong>方法2：建立覆盖索引</strong></p><div class="code-block">CREATE INDEX idx_cat_name_price ON products(category_id, product_name, price);</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>覆盖索引后Extra变为Using index</li><li>无需回表，单次查询数据量从500KB降至2KB</li><li>耗时从200ms降至5ms</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例6 -->
+<div class="case-card" data-keywords="limit 深分页 偏移量">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">6</div>
+<div class="case-title-wrap"><div class="case-title">LIMIT深分页性能问题</div><div class="case-subtitle">订单列表 — 翻到10000页后系统卡顿</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>订单管理系统，用户翻页查看历史订单，翻到第10000页时系统明显卡顿。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM orders ORDER BY created_at DESC LIMIT 1000000, 20;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>用户反馈翻页越往后越慢</li><li>EXPLAIN显示扫描行数=1000020</li><li>MySQL需要先扫描100万条记录，再返回20条</li></ul></div>
+<div class="content-block"><h4>💡 根因分析</h4><div class="highlight-box">LIMIT offset, count 需要先扫描 offset+count 行，然后丢弃前offset行。offset越大，扫描量越大。</div></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：基于主键/索引的游标分页（推荐）</strong></p><div class="code-block">SELECT * FROM orders 
+WHERE (created_at, id) < ('2024-01-15 10:00:00', 12345)
+ORDER BY created_at DESC, id DESC LIMIT 20;</div><p><strong>方法2：子查询减少回表</strong></p><div class="code-block">SELECT * FROM orders o
+JOIN (SELECT id FROM orders ORDER BY created_at DESC LIMIT 1000000, 20) tmp
+ON o.id = tmp.id;</div><p><strong>方法3：限制最大页码</strong></p><div class="code-block">if (page > 500) { return "请缩小查询范围"; }</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>游标分页扫描行数恒定为20</li><li>查询从5.2秒降至8ms</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例7 -->
+<div class="case-card" data-keywords="not in not exists 索引">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">7</div>
+<div class="case-title-wrap"><div class="case-title">NOT IN导致索引失效</div><div class="case-subtitle">用户营销 — 排除已下单用户查询缓慢</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>营销系统需要找出"注册但未下过单的用户"，用于发优惠券。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM users WHERE id NOT IN (SELECT user_id FROM orders);</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>营销活动准备阶段查询超时</li><li>EXPLAIN显示子查询DEPENDENT SUBQUERY，外层全表扫描</li><li>orders表有1000万数据，users表500万</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：NOT EXISTS改写（推荐）</strong></p><div class="code-block">SELECT * FROM users u WHERE NOT EXISTS (
+    SELECT 1 FROM orders o WHERE o.user_id = u.id
+);</div><p><strong>方法2：LEFT JOIN + IS NULL</strong></p><div class="code-block">SELECT u.* FROM users u
+LEFT JOIN orders o ON u.id = o.user_id
+WHERE o.user_id IS NULL;</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>NOT EXISTS可利用orders.user_id索引</li><li>查询从12秒降至300ms</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例8 -->
+<div class="case-card" data-keywords="is null 索引 空值">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">8</div>
+<div class="case-title-wrap"><div class="case-title">IS NULL查询不走索引</div><div class="case-subtitle">客户管理 — 查询未填写手机号的客户</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>CRM系统需要找出手机号为空的用户，提醒销售补充信息。phone字段建有普通索引。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM customers WHERE phone IS NULL;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>该查询执行慢，EXPLAIN显示type=ALL</li><li>原因：MySQL中NULL值在索引中的存储和比较方式特殊</li><li>旧版本MySQL对IS NULL的索引支持不完善</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：使用默认值替代NULL（推荐）</strong></p><div class="code-block">ALTER TABLE customers MODIFY phone VARCHAR(20) NOT NULL DEFAULT '';
+SELECT * FROM customers WHERE phone = '';</div><p><strong>方法2：使用复合索引（MySQL 8.0+优化较好）</strong></p><div class="code-block">CREATE INDEX idx_phone_name ON customers(phone, name);</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>使用空字符串后，查询命中索引</li><li>耗时从1.8秒降至15ms</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例9 -->
+<div class="case-card" data-keywords="in 子查询 索引 连接">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">9</div>
+<div class="case-title-wrap"><div class="case-title">IN子查询性能低下</div><div class="case-subtitle">权限系统 — 查询某角色下的所有用户</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>RBAC权限系统，查询拥有"管理员"角色的所有用户。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM users WHERE id IN (
+    SELECT user_id FROM user_roles WHERE role_id = 1
+);</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>角色下用户多时查询慢</li><li>EXPLAIN显示子查询MATERIALIZED，生成临时表</li><li>user_roles表数据量大时临时表开销高</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：JOIN改写（推荐）</strong></p><div class="code-block">SELECT u.* FROM users u
+JOIN user_roles ur ON u.id = ur.user_id
+WHERE ur.role_id = 1;</div><p><strong>方法2：EXISTS改写</strong></p><div class="code-block">SELECT * FROM users u WHERE EXISTS (
+    SELECT 1 FROM user_roles ur WHERE ur.user_id = u.id AND ur.role_id = 1
+);</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>JOIN可直接利用两个表的索引</li><li>避免物化子查询的临时表开销</li><li>查询从800ms降至20ms</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例10 -->
+<div class="case-card" data-keywords="count * 性能 统计">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">10</div>
+<div class="case-title-wrap"><div class="case-title">COUNT(*)大表统计慢</div><div class="case-subtitle">数据报表 — 千万级表实时统计总记录数</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>管理后台首页展示"总订单数"，订单表已有3000万数据。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT COUNT(*) FROM orders;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>首页加载慢，该查询成为瓶颈</li><li>EXPLAIN显示需要扫描全表或全索引</li><li>InnoDB的COUNT(*)需要实时计算，不能直接用元数据</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：近似值（快速展示）</strong></p><div class="code-block">SHOW TABLE STATUS LIKE 'orders';  -- 查看Rows字段，近似值</div><p><strong>方法2：缓存计数（推荐）</strong></p><div class="code-block">CREATE TABLE counters (table_name VARCHAR(50), cnt BIGINT);
+-- 插入/删除时通过触发器或应用代码更新计数</div><p><strong>方法3：Redis缓存</strong></p><div class="code-block">redis.incr("order_count");  // 新增
+redis.decr("order_count");  // 删除</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>Redis缓存方案读取为O(1)</li><li>查询从3秒降至1ms以内</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例11 -->
+<div class="case-card" data-keywords="索引列运算 加减乘除">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">11</div>
+<div class="case-title-wrap"><div class="case-title">索引列参与运算导致失效</div><div class="case-subtitle">库存管理 — 查询库存不足的商品</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>库存预警：查询"当前库存 + 在途库存 < 安全库存"的商品。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM inventory WHERE stock + in_transit < safety_stock;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>库存预警任务执行慢</li><li>EXPLAIN显示全表扫描，stock字段索引未命中</li><li>stock + in_transit 是表达式，无法使用索引</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：改写为单边运算（推荐）</strong></p><div class="code-block">SELECT * FROM inventory WHERE stock < safety_stock - in_transit;</div><p><strong>方法2：冗余计算字段</strong></p><div class="code-block">ALTER TABLE inventory ADD total_stock INT AS (stock + in_transit);
+CREATE INDEX idx_total ON inventory(total_stock, safety_stock);</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>改写后命中stock索引</li><li>耗时从2.5秒降至50ms</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例12 -->
+<div class="case-card" data-keywords="distinct group by 去重">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">12</div>
+<div class="case-title-wrap"><div class="case-title">DISTINCT去重效率低</div><div class="case-subtitle">数据分析 — 查询下单用户的城市列表</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>数据分析师需要获取"所有有订单的城市的唯一列表"。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT DISTINCT city FROM orders;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>大数据量时DISTINCT需要排序去重，消耗大量内存</li><li>orders表千万级，city无索引</li><li>EXPLAIN显示Using temporary, Using filesort</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：GROUP BY改写（推荐）</strong></p><div class="code-block">SELECT city FROM orders GROUP BY city;</div><p><strong>方法2：建立索引</strong></p><div class="code-block">CREATE INDEX idx_city ON orders(city);</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>GROUP BY在某些场景下比DISTINCT更高效</li><li>建立索引后无需临时表</li><li>耗时从4秒降至100ms</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例13 -->
+<div class="case-card" data-keywords="order by 排序 索引 文件排序">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">13</div>
+<div class="case-title-wrap"><div class="case-title">ORDER BY导致文件排序</div><div class="case-subtitle">排行榜 — 按积分排序查询TOP100</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>用户积分排行榜，需要按积分从高到低取前100名。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM users ORDER BY score DESC LIMIT 100;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>排行榜页面加载慢</li><li>EXPLAIN显示Extra: Using filesort</li><li>500万用户数据全部排序，仅取前100</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：建立排序字段索引（推荐）</strong></p><div class="code-block">CREATE INDEX idx_score ON users(score DESC);</div><p><strong>方法2：覆盖索引</strong></p><div class="code-block">CREATE INDEX idx_score_id ON users(score, id, username);</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>索引天然有序，无需filesort</li><li>Extra变为Using index</li><li>耗时从1.2秒降至10ms</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例14 -->
+<div class="case-card" data-keywords="delete 大量删除 批量">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">14</div>
+<div class="case-title-wrap"><div class="case-title">一次性DELETE大量数据</div><div class="case-subtitle">日志清理 — 删除3个月前的操作日志</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>系统日志表每月产生500万条记录，需要定期清理3个月前的数据。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">DELETE FROM operation_logs WHERE created_at < DATE_SUB(NOW(), INTERVAL 3 MONTH);</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>执行该DELETE时数据库CPU飙升，主从延迟增大</li><li>一次删除1500万行，undo日志暴增</li><li>行锁持有时间过长，其他查询被阻塞</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：分批删除（推荐）</strong></p><div class="code-block">DELETE FROM operation_logs 
+WHERE created_at < DATE_SUB(NOW(), INTERVAL 3 MONTH)
+LIMIT 10000;</div><p><strong>方法2：分区表 + DROP分区</strong></p><div class="code-block">ALTER TABLE operation_logs DROP PARTITION p202401;</div><p><strong>方法3：先归档再删除</strong></p></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>分批删除避免大事务和锁竞争</li><li>DROP分区是元数据操作，瞬间完成</li><li>主从延迟从分钟级降至秒级</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例15 -->
+<div class="case-card" data-keywords="update 大量更新 批量">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">15</div>
+<div class="case-title-wrap"><div class="case-title">一次性UPDATE大量数据</div><div class="case-subtitle">价格调整 — 全品类商品调价10%</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>运营活动需要对所有商品涨价10%。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">UPDATE products SET price = price * 1.1;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>执行时整个商品服务卡顿</li><li>100万商品全部加X锁，其他事务无法读取</li><li>undo日志巨大，回滚风险高</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：分批更新（推荐）</strong></p><div class="code-block">UPDATE products SET price = price * 1.1 
+WHERE id BETWEEN 1 AND 10000;
+-- 循环执行，每次调整范围</div><p><strong>方法2：低峰期执行 + 减少锁持有</strong></p><div class="code-block">SET SESSION innodb_lock_wait_timeout = 5;</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>分批更新减少单次锁持有时间和undo量</li><li>其他业务查询正常进行</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例16 -->
+<div class="case-card" data-keywords="join 连接 驱动表 被驱动表">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">16</div>
+<div class="case-title-wrap"><div class="case-title">JOIN小表驱动大表顺序错误</div><div class="case-subtitle">订单查询 — 关联用户表和订单表</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>查询特定用户群体的订单信息，用户表100万，订单表1000万。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT o.* FROM orders o
+JOIN users u ON o.user_id = u.id
+WHERE u.vip_level = 'gold';</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>查询执行时间长</li><li>EXPLAIN显示orders为驱动表，全表扫描</li><li>MySQL优化器有时会选择错误的JOIN顺序</li></ul></div>
+<div class="content-block"><h4>💡 根因分析</h4><div class="highlight-box">Nested Loop Join的原理是：驱动表每行去被驱动表查一次。驱动表越小，总扫描次数越少。</div></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：STRAIGHT_JOIN强制顺序（推荐）</strong></p><div class="code-block">SELECT o.* FROM users u
+STRAIGHT_JOIN orders o ON o.user_id = u.id
+WHERE u.vip_level = 'gold';</div><p><strong>方法2：改写为IN子查询</strong></p><div class="code-block">SELECT * FROM orders WHERE user_id IN (
+    SELECT id FROM users WHERE vip_level = 'gold'
+);</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>小表users为驱动表，只需扫描少量行</li><li>查询从5秒降至200ms</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例17 -->
+<div class="case-card" data-keywords="exists 半连接 优化">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">17</div>
+<div class="case-title-wrap"><div class="case-title">EXISTS vs IN选择不当</div><div class="case-subtitle">商品筛选 — 查询有库存的商品</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>商品列表需要筛选"有库存"的商品。products表10万，inventory表50万。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM products WHERE id IN (
+    SELECT product_id FROM inventory WHERE stock > 0
+);</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>商品列表加载慢</li><li>子查询结果被物化为临时表</li><li>inventory表数据量大，物化成本高</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：EXISTS改写（推荐，子表大时）</strong></p><div class="code-block">SELECT * FROM products p WHERE EXISTS (
+    SELECT 1 FROM inventory i WHERE i.product_id = p.id AND i.stock > 0
+);</div><p><strong>方法2：JOIN改写</strong></p><div class="code-block">SELECT DISTINCT p.* FROM products p
+JOIN inventory i ON p.id = i.product_id WHERE i.stock > 0;</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>EXISTS避免物化，直接利用索引</li><li>查询从600ms降至30ms</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例18 -->
+<div class="case-card" data-keywords="union union all 去重">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">18</div>
+<div class="case-title-wrap"><div class="case-title">UNION多余去重操作</div><div class="case-subtitle">数据合并 — 合并两个来源的订单</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>合并线上订单和线下订单，两个表数据无交集。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT order_no, amount FROM online_orders
+UNION
+SELECT order_no, amount FROM offline_orders;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>查询慢，EXPLAIN显示Using temporary</li><li>UNION默认会去重，需要创建临时表+排序去重</li><li>两表数据本身不重复，去重是多余的</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：改用UNION ALL（推荐）</strong></p><div class="code-block">SELECT order_no, amount FROM online_orders
+UNION ALL
+SELECT order_no, amount FROM offline_orders;</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>UNION ALL无需临时表去重</li><li>耗时从1.5秒降至200ms</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例19 -->
+<div class="case-card" data-keywords="索引冗余 重复索引">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">19</div>
+<div class="case-title-wrap"><div class="case-title">重复/冗余索引浪费空间</div><div class="case-subtitle">表维护 — 索引过多导致写入慢</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>订单表上有多个索引，导致INSERT和UPDATE性能下降。</p></div>
+<div class="content-block"><h4>🔴 问题发现</h4><div class="code-block">SHOW INDEX FROM orders;
+-- 发现冗余索引：
+-- KEY idx_user_id (user_id)
+-- KEY idx_user_status (user_id, status)
+-- KEY idx_user_status_created (user_id, status, created_at)</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>订单写入TPS逐渐下降</li><li>使用pt-duplicate-key-checker或sys.schema_redundant_indexes检查</li><li>idx_user_id被idx_user_status覆盖；idx_user_status被idx_user_status_created覆盖</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：删除冗余索引（推荐）</strong></p><div class="code-block">ALTER TABLE orders DROP INDEX idx_user_id;
+ALTER TABLE orders DROP INDEX idx_user_status;</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>减少索引维护开销</li><li>INSERT性能提升约30%</li><li>释放磁盘空间</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例20 -->
+<div class="case-card" data-keywords="varchar 长度 索引 前缀">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">20</div>
+<div class="case-title-wrap"><div class="case-title">VARCHAR长字段建索引</div><div class="case-subtitle">用户表 — 邮箱字段建索引</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>用户表按邮箱查询登录，email字段为VARCHAR(255)。</p></div>
+<div class="content-block"><h4>🔴 问题索引</h4><div class="code-block">CREATE INDEX idx_email ON users(email);</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>索引体积大，占用大量磁盘空间</li><li>InnoDB单索引最大767字节（utf8mb4下）</li><li>索引页能存更少entries，B+树更高，IO更多</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：前缀索引（推荐）</strong></p><div class="code-block">CREATE INDEX idx_email ON users(email(20));</div><p><strong>方法2：使用哈希值索引</strong></p><div class="code-block">ALTER TABLE users ADD email_hash BIGINT AS (CRC32(email));
+CREATE INDEX idx_email_hash ON users(email_hash);</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>前缀索引节省约70%索引空间</li><li>查询性能相当</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例21 -->
+<div class="case-card" data-keywords="join buffer 连接缓存">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">21</div>
+<div class="case-title-wrap"><div class="case-title">JOIN Buffer不足导致磁盘临时表</div><div class="case-subtitle">报表查询 — 多表关联聚合</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>财务报表需要JOIN订单、用户、商品、分类4张表。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT u.name, p.name, c.name, SUM(o.amount)
+FROM orders o
+JOIN users u ON o.user_id = u.id
+JOIN products p ON o.product_id = p.id
+JOIN categories c ON p.category_id = c.id
+GROUP BY u.name, p.name, c.name;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>报表查询慢，频繁出现磁盘临时表</li><li>EXPLAIN显示Using join buffer (Block Nested Loop)</li><li>join_buffer_size设置过小（默认256KB）</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：增大join_buffer_size</strong></p><div class="code-block">SET SESSION join_buffer_size = 4 * 1024 * 1024;  -- 4MB</div><p><strong>方法2：优化JOIN条件确保走索引</strong></p><div class="code-block">CREATE INDEX idx_product_category ON products(category_id);</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>减少磁盘临时表生成</li><li>查询从8秒降至1秒</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例22 -->
+<div class="case-card" data-keywords="where 1=1 动态SQL 条件">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">22</div>
+<div class="case-title-wrap"><div class="case-title">WHERE 1=1影响索引选择</div><div class="case-subtitle">后台管理 — 动态条件拼接查询</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>管理后台查询接口，Java代码动态拼接WHERE条件，习惯性以WHERE 1=1开头。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM orders WHERE 1=1 AND status = 'paid' AND user_id = 100;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>MySQL 5.x版本中，WHERE 1=1可能干扰优化器</li><li>某些场景下优化器无法正确选择索引</li><li>现代MySQL影响较小，但仍属不良实践</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：去掉1=1，动态拼接时处理AND（推荐）</strong></p><div class="code-block">StringBuilder sql = new StringBuilder("SELECT * FROM orders WHERE");
+boolean hasCondition = false;
+if (status != null) { sql.append(hasCondition ? " AND " : "").append("status = ?"); hasCondition = true; }</div><p><strong>方法2：使用MyBatis等ORM的动态SQL</strong></p></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>代码更清晰，便于阅读和维护</li><li>避免潜在的优化器问题</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例23 -->
+<div class="case-card" data-keywords="group by 排序 临时表">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">23</div>
+<div class="case-title-wrap"><div class="case-title">GROUP BY触发临时表和文件排序</div><div class="case-subtitle">统计报表 — 按品类统计销售额</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>按商品分类统计各品类销售额。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT category_id, SUM(amount) FROM orders GROUP BY category_id;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>EXPLAIN显示Using temporary; Using filesort</li><li>category_id无索引，需临时表分组</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：建立索引（推荐）</strong></p><div class="code-block">CREATE INDEX idx_cat_amount ON orders(category_id, amount);</div><p><strong>方法2：ORDER BY NULL避免排序</strong></p><div class="code-block">SELECT category_id, SUM(amount) FROM orders GROUP BY category_id ORDER BY NULL;</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>覆盖索引后无需临时表</li><li>耗时从2秒降至30ms</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例24 -->
+<div class="case-card" data-keywords="having where 过滤 聚合">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">24</div>
+<div class="case-title-wrap"><div class="case-title">HAVING替代WHERE过滤</div><div class="case-subtitle">用户分析 — 统计消费超过1000的用户</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>找出总消费金额大于1000的用户。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT user_id, SUM(amount) AS total FROM orders
+GROUP BY user_id
+HAVING total > 1000;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>HAVING在聚合后过滤，需要对所有用户分组计算</li><li>若先WHERE过滤单条记录，可减少聚合数据量</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：先WHERE再聚合（推荐）</strong></p><div class="code-block">SELECT user_id, SUM(amount) AS total FROM orders
+WHERE status != 'cancelled'
+GROUP BY user_id
+HAVING total > 1000;</div><p><strong>方法2：子查询预过滤</strong></p><div class="code-block">SELECT * FROM (
+    SELECT user_id, SUM(amount) AS total FROM orders GROUP BY user_id
+) t WHERE t.total > 1000;</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>先过滤减少聚合数据量</li><li>查询提升约40%</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例25 -->
+<div class="case-card" data-keywords="insert 批量插入 单条">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">25</div>
+<div class="case-title-wrap"><div class="case-title">单条INSERT循环插入</div><div class="case-subtitle">数据导入 — 批量导入订单数据</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>从Excel导入1万条订单，Java代码逐条INSERT。</p></div>
+<div class="content-block"><h4>🔴 问题代码</h4><div class="code-block">for (Order order : orders) {
+    jdbcTemplate.update("INSERT INTO orders (...) VALUES (...)", ...);
+}</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>导入1万条需要5分钟</li><li>每条INSERT都是独立事务，频繁写redo/undo</li><li>网络往返1万次</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：批量INSERT（推荐）</strong></p><div class="code-block">INSERT INTO orders (order_no, user_id, amount) VALUES
+('A001', 1, 100), ('A002', 2, 200), ('A003', 3, 300), ...;</div><p><strong>方法2：LOAD DATA INFILE</strong></p><div class="code-block">LOAD DATA INFILE '/tmp/orders.csv' INTO TABLE orders 
+FIELDS TERMINATED BY ',';</div><p><strong>方法3：JDBC Batch</strong></p><div class="code-block">PreparedStatement ps = conn.prepareStatement(sql);
+for (Order o : orders) {
+    ps.setString(1, o.getOrderNo());
+    ps.addBatch();
+    if (++count % 1000 == 0) ps.executeBatch();
+}</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>批量插入1万条约2秒</li><li>LOAD DATA约500ms</li><li>性能提升100倍以上</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例26 -->
+<div class="case-card" data-keywords="count 1 count * 性能">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">26</div>
+<div class="case-title-wrap"><div class="case-title">COUNT(1) vs COUNT(*)误解</div><div class="case-subtitle">统计计数 — 两种写法性能对比</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>团队内部争议：COUNT(1)和COUNT(*)哪个更快？</p></div>
+<div class="content-block"><h4>🔍 分析过程</h4><ul><li>MySQL官方文档明确说明：COUNT(*)和COUNT(1)在InnoDB中无性能差异</li><li>优化器会自动优化为相同的执行计划</li><li>COUNT(字段)才需要判断是否NULL，性能可能不同</li></ul></div>
+<div class="content-block"><h4>✅ 正确做法</h4><div class="highlight-box">使用COUNT(*)统计行数，语义清晰，是SQL标准写法。COUNT(1)是历史遗留习惯，现代数据库无需刻意使用。</div></div>
+</div></div>
+</div>
+
+<!-- 案例27 -->
+<div class="case-card" data-keywords="null 空值 索引 默认值">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">27</div>
+<div class="case-title-wrap"><div class="case-title">字段允许NULL导致索引选择性问题</div><div class="case-subtitle">用户注册 — 手机号非必填</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>用户表phone字段允许NULL，50%用户未填写。需要查询有手机号的用户。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM users WHERE phone IS NOT NULL;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>该查询返回50%数据，优化器可能放弃索引选择全表扫描</li><li>NULL值在索引中存储特殊，影响选择性统计</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：使用默认值替代NULL（推荐）</strong></p><div class="code-block">ALTER TABLE users MODIFY phone VARCHAR(20) NOT NULL DEFAULT '';</div><p><strong>方法2：查询时加额外条件缩小范围</strong></p><div class="code-block">SELECT * FROM users WHERE phone != '' AND created_at > '2024-01-01';</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>默认值方案使索引统计更准确</li><li>优化器更容易选择正确执行计划</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例28 -->
+<div class="case-card" data-keywords="索引 最左前缀 复合索引">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">28</div>
+<div class="case-title-wrap"><div class="case-title">违反最左前缀原则</div><div class="case-subtitle">订单查询 — 复合索引未按顺序使用</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>订单表有复合索引 (user_id, status, created_at)，需要按状态查询订单。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM orders WHERE status = 'paid';</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>EXPLAIN显示未命中复合索引</li><li>查询条件缺少user_id（索引最左列）</li></ul></div>
+<div class="content-block"><h4>💡 根因分析</h4><div class="highlight-box">复合索引按最左列有序存储。跳过user_id直接用status，相当于在无序的数据中查找，无法使用索引。</div></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：新建单列索引（推荐）</strong></p><div class="code-block">CREATE INDEX idx_status ON orders(status);</div><p><strong>方法2：调整查询带上最左列</strong></p><div class="code-block">SELECT * FROM orders WHERE user_id > 0 AND status = 'paid';</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>新建索引后查询命中</li><li>耗时从2秒降至20ms</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例29 -->
+<div class="case-card" data-keywords="索引下推 ICP 条件过滤">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">29</div>
+<div class="case-title-wrap"><div class="case-title">未利用索引下推（ICP）</div><div class="case-subtitle">库存查询 — 多条件筛选商品</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>商品表有索引 (category_id, price)，查询某分类下价格大于100的商品。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM products WHERE category_id = 10 AND price > 100;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>MySQL 5.6前版本，索引只匹配category_id，price条件需回表后过滤</li><li>EXPLAIN显示Using where，未显示Using index condition</li></ul></div>
+<div class="content-block"><h4>💡 根因分析</h4><div class="highlight-box">索引下推（Index Condition Pushdown）是MySQL 5.6引入的优化，可以在索引遍历阶段就过滤price条件，减少回表次数。</div></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：确认ICP已开启（默认开启）</strong></p><div class="code-block">SHOW VARIABLES LIKE 'optimizer_switch';
+-- 确保index_condition_pushdown=on</div><p><strong>方法2：使用覆盖索引</strong></p><div class="code-block">CREATE INDEX idx_cat_price_name ON products(category_id, price, product_name);</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>ICP减少回表次数50%以上</li><li>查询性能提升明显</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例30 -->
+<div class="case-card" data-keywords="排序 索引 文件排序 filesort">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-easy">30</div>
+<div class="case-title-wrap"><div class="case-title">多字段排序与索引顺序不一致</div><div class="case-subtitle">商品列表 — 按价格和销量排序</div></div>
+<span class="case-level level-easy">入门</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>商品列表按价格升序、销量降序排列。现有索引 (price, sales)。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM products ORDER BY price ASC, sales DESC;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>EXPLAIN显示Using filesort</li><li>索引是(price ASC, sales ASC)，排序方向不一致</li></ul></div>
+<div class="content-block"><h4>💡 根因分析</h4><div class="highlight-box">MySQL 8.0前，索引只能全升序或全降序，不能混合。8.0+支持降序索引。</div></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：MySQL 8.0+建立降序索引（推荐）</strong></p><div class="code-block">CREATE INDEX idx_price_sales ON products(price ASC, sales DESC);</div><p><strong>方法2：统一排序方向</strong></p><div class="code-block">SELECT * FROM products ORDER BY price ASC, sales ASC;</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>MySQL 8.0降序索引后无filesort</li><li>耗时从800ms降至15ms</li></ul></div>
+</div></div>
+</div>
+
+<!-- ==================== 进阶篇 (31-60) ==================== -->
+<div class="section-title" id="medium"><span style="font-size:26px;margin-right:6px;">🚀</span>进阶篇 (31-60) —— 查询重构与高级索引优化</div>
+
+<!-- 案例31 -->
+<div class="case-card" data-keywords="子查询 派生表 物化 derived">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">31</div>
+<div class="case-title-wrap"><div class="case-title">派生表（Derived Table）物化性能问题</div><div class="case-subtitle">复杂报表 — FROM子查询生成临时表</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>统计每个用户最近一次订单的金额。使用FROM子查询作为派生表。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT u.name, t.amount FROM users u
+JOIN (SELECT user_id, amount FROM orders WHERE id IN (
+    SELECT MAX(id) FROM orders GROUP BY user_id
+)) t ON u.id = t.user_id;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>报表查询极慢，内存占用高</li><li>EXPLAIN显示&lt;derived2&gt;被物化为临时表</li><li>派生表无索引，JOIN时全表扫描</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：派生表合并（MySQL 5.7+，默认开启）</strong></p><div class="code-block">SET optimizer_switch='derived_merge=on';</div><p><strong>方法2：改写为JOIN避免派生表</strong></p><div class="code-block">SELECT u.name, o.amount FROM users u
+JOIN orders o ON o.id = (
+    SELECT MAX(id) FROM orders WHERE user_id = u.id
+);</div><p><strong>方法3：窗口函数（MySQL 8.0+，推荐）</strong></p><div class="code-block">SELECT DISTINCT u.name, o.amount FROM users u
+JOIN (SELECT user_id, amount,
+      ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY id DESC) AS rn
+      FROM orders) o ON u.id = o.user_id
+WHERE o.rn = 1;</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>窗口函数方案避免物化临时表</li><li>查询从15秒降至500ms</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例32 -->
+<div class="case-card" data-keywords="join 延迟关联 子查询">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">32</div>
+<div class="case-title-wrap"><div class="case-title">延迟关联（Deferred Join）优化分页</div><div class="case-subtitle">文章列表 — 大数据量分页查询</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>文章表1000万数据，分页展示，每页20条，深分页时极慢。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM articles ORDER BY created_at DESC LIMIT 500000, 20;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>翻到后面页码时页面转圈很久</li><li>EXPLAIN显示扫描50万+行</li><li>大量数据排序后丢弃</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：延迟关联（推荐）</strong></p><div class="code-block">SELECT a.* FROM articles a
+JOIN (SELECT id FROM articles ORDER BY created_at DESC LIMIT 500000, 20) tmp
+ON a.id = tmp.id;</div><p><strong>方法2：记住上次位置（游标分页）</strong></p><div class="code-block">SELECT * FROM articles 
+WHERE (created_at, id) < ('2024-01-01 10:00:00', 12345)
+ORDER BY created_at DESC LIMIT 20;</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>延迟关联只查索引列，减少回表</li><li>从5秒降至80ms</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例33 -->
+<div class="case-card" data-keywords="exists 半连接 优化">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">33</div>
+<div class="case-title-wrap"><div class="case-title">半连接（Semi-Join）优化</div><div class="case-subtitle">商品筛选 — IN子查询优化</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>查询"有评价记录的商品列表"。products表50万，reviews表200万。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM products WHERE id IN (SELECT product_id FROM reviews);</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>查询执行时间长</li><li>MySQL 5.6前会将子查询物化为临时表</li><li>EXPLAIN显示MATERIALIZED</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：利用半连接优化（MySQL 5.6+自动）</strong></p><div class="code-block">-- MySQL 5.6+会自动将IN子查询转为半连接
+-- EXPLAIN显示FirstMatch或LooseScan</div><p><strong>方法2：显式改写为EXISTS</strong></p><div class="code-block">SELECT * FROM products p WHERE EXISTS (
+    SELECT 1 FROM reviews r WHERE r.product_id = p.id
+);</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>半连接避免物化临时表</li><li>查询从3秒降至100ms</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例34 -->
+<div class="case-card" data-keywords="索引 选择性 基数 cardinality">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">34</div>
+<div class="case-title-wrap"><div class="case-title">低选择性索引导致优化器不选</div><div class="case-subtitle">用户表 — 性别字段建索引</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>用户表有性别字段（男/女/未知），建了索引。查询男性用户。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM users WHERE gender = 'male';</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>EXPLAIN显示type=ALL，未走索引</li><li>gender字段选择性极低（约50%）</li><li>优化器判断全表扫描比索引+回表更划算</li></ul></div>
+<div class="content-block"><h4>💡 根因分析</h4><div class="highlight-box">索引的选择性 = 不重复值数量 / 总记录数。选择性越低，索引效果越差。性别字段选择性≈0.5，不适合单独建索引。</div></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：组合索引（推荐）</strong></p><div class="code-block">CREATE INDEX idx_gender_city ON users(gender, city);  -- 选择性更高</div><p><strong>方法2：删除低选择性单列索引</strong></p><div class="code-block">ALTER TABLE users DROP INDEX idx_gender;</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>组合索引后city条件同时过滤</li><li>查询更精准，索引被使用</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例35 -->
+<div class="case-card" data-keywords="索引 覆盖索引 回表">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">35</div>
+<div class="case-title-wrap"><div class="case-title">回表次数过多优化</div><div class="case-subtitle">商品搜索 — 列表页大量回表</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>商品列表页按分类查询，展示名称、价格、图片。只建了一个category_id索引。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT name, price, image_url FROM products WHERE category_id = 100 LIMIT 100;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>查询需要回表100次取name/price/image_url</li><li>EXPLAIN显示Using where，非覆盖索引</li><li>随机IO导致性能下降</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：覆盖索引（推荐）</strong></p><div class="code-block">CREATE INDEX idx_cat_name_price_img ON products(category_id, name, price, image_url);</div><p><strong>方法2：延迟关联</strong></p><div class="code-block">SELECT p.name, p.price, p.image_url FROM products p
+JOIN (SELECT id FROM products WHERE category_id = 100 LIMIT 100) tmp
+ON p.id = tmp.id;</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>覆盖索引后Extra=Using index，无回表</li><li>耗时从300ms降至10ms</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例36 -->
+<div class="case-card" data-keywords="索引 跳跃扫描 skip scan">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">36</div>
+<div class="case-title-wrap"><div class="case-title">索引跳跃扫描（Skip Scan）利用</div><div class="case-subtitle">订单查询 — 跳过了最左列</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>订单表有复合索引 (user_id, status)，现在想按status查询。MySQL 8.0.13+支持Skip Scan。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM orders WHERE status = 'paid';</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>原本需新建status单列索引</li><li>MySQL 8.0.13+引入Skip Scan，可跳过最左列</li><li>EXPLAIN可能显示Using index for skip scan</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：利用Skip Scan（MySQL 8.0.13+）</strong></p><div class="code-block">SET optimizer_switch='skip_scan=on';</div><p><strong>方法2：若版本不支持，新建索引</strong></p><div class="code-block">CREATE INDEX idx_status ON orders(status);</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>Skip Scan避免冗余索引</li><li>节省索引维护开销</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例37 -->
+<div class="case-card" data-keywords="join 哈希连接 hash join">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">37</div>
+<div class="case-title-wrap"><div class="case-title">大数据量JOIN走Nested Loop慢</div><div class="case-subtitle">数据分析 — 两张大表关联</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>分析订单和日志的关联数据，orders表5000万，logs表3000万，无合适索引。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT o.*, l.action FROM orders o
+JOIN logs l ON o.id = l.order_id;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>Nested Loop Join需要5亿次迭代</li><li>执行时间不可接受</li><li>logs.order_id无索引</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：使用Hash Join（MySQL 8.0.18+，推荐）</strong></p><div class="code-block">-- MySQL 8.0.18+自动选择Hash Join
+EXPLAIN FORMAT=TREE SELECT ...;</div><p><strong>方法2：加索引</strong></p><div class="code-block">CREATE INDEX idx_log_order ON logs(order_id);</div><p><strong>方法3：先导入数据仓库分析</strong></p><div class="code-block">-- 使用ClickHouse/Hive等OLAP引擎</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>Hash Join适合无索引的大表关联</li><li>性能提升10倍以上</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例38 -->
+<div class="case-card" data-keywords="索引 冗余 重复 合并">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">38</div>
+<div class="case-title-wrap"><div class="case-title">索引合并（Index Merge）优化</div><div class="case-subtitle">多条件查询 — OR条件利用多个索引</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>查询"状态为已取消 或 创建时间超过一年的订单"。status和created_at各有索引。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM orders WHERE status = 'cancelled' OR created_at < DATE_SUB(NOW(), INTERVAL 1 YEAR);</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>OR条件通常不走索引或只走一个</li><li>MySQL 5.6+支持Index Merge</li><li>需确认optimizer_switch设置</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：开启Index Merge（推荐）</strong></p><div class="code-block">SET optimizer_switch='index_merge=on,index_merge_union=on';
+-- EXPLAIN显示type=index_merge, key=idx_status,idx_created</div><p><strong>方法2：改写为UNION</strong></p><div class="code-block">SELECT * FROM orders WHERE status = 'cancelled'
+UNION ALL
+SELECT * FROM orders WHERE created_at < DATE_SUB(NOW(), INTERVAL 1 YEAR) AND status != 'cancelled';</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>Index Merge同时利用两个索引</li><li>查询从6秒降至200ms</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例39 -->
+<div class="case-card" data-keywords="查询 缓存 预热 分页">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">39</div>
+<div class="case-title-wrap"><div class="case-title">查询缓存预热</div><div class="case-subtitle">热点数据 — 应用启动后首次查询慢</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>商品详情页依赖的SKU信息查询，应用重启后首次访问慢（InnoDB Buffer Pool为空）。</p></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>应用重启后，首次查询从磁盘读取</li><li>Buffer Pool Miss率高，物理IO多</li><li>用户体验差，首屏加载慢</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：Buffer Pool Dump/Load（推荐）</strong></p><div class="code-block">SET GLOBAL innodb_buffer_pool_dump_at_shutdown = ON;
+SET GLOBAL innodb_buffer_pool_load_at_startup = ON;</div><p><strong>方法2：应用层缓存预热</strong></p><div class="code-block">@PostConstruct
+public void warmUp() {
+    List<Long> hotIds = Arrays.asList(1L, 2L, 3L, ...);
+    hotIds.forEach(id -> productService.getById(id));
+}</div><p><strong>方法3：定时预热脚本</strong></p></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>Buffer Pool命中率从0%提升至95%+</li><li>重启后首次查询恢复正常水平</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例40 -->
+<div class="case-card" data-keywords="索引 统计信息 analyze">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">40</div>
+<div class="case-title-wrap"><div class="case-title">统计信息过期导致执行计划错误</div><div class="case-subtitle">大表批量导入后查询变慢</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>批量导入100万订单后，查询突然变慢，执行计划发生变化。</p></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>导入前查询走索引，导入后全表扫描</li><li>EXPLAIN显示rows估算严重不准</li><li>表统计信息未更新</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：更新统计信息（推荐）</strong></p><div class="code-block">ANALYZE TABLE orders;</div><p><strong>方法2：设置自动分析阈值</strong></p><div class="code-block">SET GLOBAL innodb_stats_auto_recalc = ON;
+SET GLOBAL innodb_stats_persistent = ON;</div><p><strong>方法3：定期执行ANALYZE</strong></p><div class="code-block">ANALYZE TABLE orders, users, products;</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>统计信息更新后，优化器选择正确索引</li><li>查询恢复正常</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例41 -->
+<div class="case-card" data-keywords="主键 UUID 自增ID 索引碎片">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">41</div>
+<div class="case-title-wrap"><div class="case-title">UUID主键导致索引页分裂</div><div class="case-subtitle">分布式系统 — 使用UUID作主键</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>微服务架构中订单表使用UUID作为主键，避免全局唯一冲突。</p></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>订单表写入性能逐渐下降</li><li>索引碎片率高，表空间膨胀</li><li>UUID随机写入导致B+树频繁分裂</li></ul></div>
+<div class="content-block"><h4>💡 根因分析</h4><div class="highlight-box">自增ID是顺序插入，新数据总在B+树尾部。UUID是随机值，插入位置随机，导致频繁的页分裂和碎片。</div></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：使用有序UUID（推荐）</strong></p><div class="code-block">INSERT INTO orders (id) VALUES (UUID_TO_BIN(UUID(), 1));</div><p><strong>方法2：雪花算法（Snowflake）</strong></p><div class="code-block">-- 应用层生成趋势递增的分布式ID</div><p><strong>方法3：自增ID + UUID映射表</strong></p><div class="code-block">CREATE TABLE order_uuid_map (id BIGINT AUTO_INCREMENT, uuid CHAR(36), PRIMARY KEY (id), UNIQUE KEY (uuid));</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>有序UUID写入性能接近自增ID</li><li>索引碎片率从80%降至10%</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例42 -->
+<div class="case-card" data-keywords="分库分表 中间件 sharding">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">42</div>
+<div class="case-title-wrap"><div class="case-title">单表数据量过大考虑分表</div><div class="case-subtitle">订单表 — 2亿数据查询卡顿</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>订单表达到2亿行，即使走索引，查询和维护都变得很慢。</p></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>查询响应时间不稳定，偶尔超时</li><li>DDL操作（加索引）需要数小时</li><li>备份和恢复时间不可接受</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：按时间分区/分表（推荐）</strong></p><div class="code-block">orders_202401, orders_202402, ...
+-- 使用ShardingSphere等中间件路由</div><p><strong>方法2：按用户ID哈希分表</strong></p><div class="code-block">-- user_id % 128 决定存哪张表
+orders_00 ~ orders_127</div><p><strong>方法3：归档历史数据</strong></p><div class="code-block">-- 热数据（最近1年）在MySQL，冷数据迁到归档库</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>单表数据量降至百万级</li><li>查询性能稳定，DDL可接受</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例43 -->
+<div class="case-card" data-keywords="读写分离 主从延迟 从库">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">43</div>
+<div class="case-title-wrap"><div class="case-title">读写分离后主从延迟问题</div><div class="case-subtitle">电商系统 — 下单后查不到订单</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>用户下单后立即查看订单详情，但查询走了从库，数据还没同步过来。</p></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>用户反馈"下单后显示没有订单"</li><li>主从延迟监控显示偶尔有秒级延迟</li><li>高峰期延迟更明显</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：关键读强制走主库（推荐）</strong></p><div class="code-block">// 用户自己的订单详情强制走主库
+@Transactional(readOnly = true)
+public Order getMyOrder(Long userId, Long orderId) {
+    return masterDataSource.query(...);
+}</div><p><strong>方法2：延迟敏感操作标记</strong></p><div class="code-block">-- 写后N秒内读主库</div><p><strong>方法3：半同步复制</strong></p><div class="code-block">SET GLOBAL rpl_semi_sync_master_enabled = 1;</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>用户读自己的最新数据不再延迟</li><li>用户体验问题解决</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例44 -->
+<div class="case-card" data-keywords="连接池 线程池 连接数">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">44</div>
+<div class="case-title-wrap"><div class="case-title">数据库连接池配置不当</div><div class="case-subtitle">高并发 — Too many connections</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>大促期间系统报"Too many connections"，但CPU和内存并不高。</p></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>MySQL max_connections=500</li><li>应用层连接池每台配100，10台机器就1000</li><li>连接数远超数据库承受能力</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：合理配置连接池（推荐）</strong></p><div class="code-block">maximum-pool-size: 20
+minimum-idle: 5
+connection-timeout: 30000
+idle-timeout: 600000
+max-lifetime: 1800000</div><p><strong>方法2：增大MySQL连接数（辅助）</strong></p><div class="code-block">SET GLOBAL max_connections = 1000;</div><p><strong>方法3：增加数据库中间件（ProxySQL等）</strong></p></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>连接数可控，无连接风暴</li><li>系统稳定运行</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例45 -->
+<div class="case-card" data-keywords="大事务 长事务 锁超时">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">45</div>
+<div class="case-title-wrap"><div class="case-title">大事务导致锁超时和主从延迟</div><div class="case-subtitle">数据迁移 — 批量更新产生长事务</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>运营批量修改100万商品的价格，在一个事务中完成。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">UPDATE products SET price = price * 1.1;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>执行期间其他更新商品的操作超时</li><li>主从延迟飙升到分钟级</li><li>Undo表空间暴增</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：拆分为小事务（推荐）</strong></p><div class="code-block">SET autocommit=0;
+FOR each batch of 1000 rows:
+    UPDATE products SET price = ... WHERE id BETWEEN ...;
+    COMMIT;</div><p><strong>方法2：低峰期执行</strong></p><div class="code-block">-- 凌晨2-5点执行大事务</div><p><strong>方法3：在线DDL工具（pt-osc/gh-ost）</strong></p></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>单次事务持有锁时间从分钟降至秒级</li><li>主从延迟可控</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例46 -->
+<div class="case-card" data-keywords="慢查询日志 slow log 分析">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">46</div>
+<div class="case-title-wrap"><div class="case-title">慢查询日志分析与治理</div><div class="case-subtitle">系统优化 — 持续发现慢SQL</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>建立慢SQL治理机制，持续发现和优化慢查询。</p></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>开启慢查询日志，收集慢SQL</li><li>使用pt-query-digest分析日志</li><li>发现TOP慢SQL列表</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：开启慢查询日志（推荐）</strong></p><div class="code-block">SET GLOBAL slow_query_log = ON;
+SET GLOBAL long_query_time = 1;
+SET GLOBAL log_queries_not_using_indexes = ON;</div><p><strong>方法2：使用Performance Schema</strong></p><div class="code-block">SELECT * FROM performance_schema.events_statements_summary_by_digest
+ORDER BY SUM_TIMER_WAIT DESC LIMIT 10;</div><p><strong>方法3：接入APM工具（Arthas/SkyWalking）</strong></p></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>慢SQL可量化、可追踪</li><li>形成持续优化闭环</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例47 -->
+<div class="case-card" data-keywords="索引 选择性 直方图 histogram">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">47</div>
+<div class="case-title-wrap"><div class="case-title">数据分布不均导致索引选择错误</div><div class="case-subtitle">订单状态 — 99%是已完成</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>订单表status字段：99%是'completed'，0.5%是'pending'，0.5%是'cancelled'。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM orders WHERE status = 'pending';</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>查pending订单偶尔全表扫描</li><li>优化器认为status索引选择性低</li><li>数据分布不均匀，平均值不能反映实际情况</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：创建直方图（MySQL 8.0+，推荐）</strong></p><div class="code-block">ANALYZE TABLE orders UPDATE HISTOGRAM ON status WITH 100 BUCKETS;</div><p><strong>方法2：强制索引</strong></p><div class="code-block">SELECT * FROM orders FORCE INDEX(idx_status) WHERE status = 'pending';</div><p><strong>方法3：拆分状态到不同表</strong></p></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>直方图帮助优化器了解数据分布</li><li>正确选择索引</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例48 -->
+<div class="case-card" data-keywords="分区表 partition 裁剪">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">48</div>
+<div class="case-title-wrap"><div class="case-title">分区表未利用分区裁剪</div><div class="case-subtitle">日志表 — 按时间分区但查询未命中</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>日志表按月分区，但查询条件使用函数导致无法分区裁剪。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM logs WHERE YEAR(created_at) = 2024 AND MONTH(created_at) = 1;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>EXPLAIN显示 partitions: p202401,p202402,...（扫描所有分区）</li><li>YEAR()函数导致分区键无法直接匹配</li><li>分区优势完全丧失</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：改写为范围查询（推荐）</strong></p><div class="code-block">SELECT * FROM logs WHERE created_at >= '2024-01-01' AND created_at < '2024-02-01';</div><p><strong>方法2：EXPLAIN PARTITIONS确认裁剪</strong></p><div class="code-block">EXPLAIN PARTITIONS SELECT ...;  -- 确认只扫描p202401</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>分区裁剪后只扫描1个分区</li><li>查询从5秒降至50ms</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例49 -->
+<div class="case-card" data-keywords="前缀索引 选择性 重复度">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">49</div>
+<div class="case-title-wrap"><div class="case-title">前缀索引长度选择不当</div><div class="case-subtitle">邮箱字段 — 前缀索引太短导致选择性差</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>用户邮箱建前缀索引，取了前3位，但大量邮箱以"163"、"qq"、"gmail"开头。</p></div>
+<div class="content-block"><h4>🔴 问题索引</h4><div class="code-block">CREATE INDEX idx_email ON users(email(3));</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>前缀索引选择性极低</li><li>查询时匹配大量记录，仍需大量回表</li><li>索引效果差</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：计算最优前缀长度（推荐）</strong></p><div class="code-block">SELECT COUNT(DISTINCT LEFT(email, 5)) / COUNT(DISTINCT email) AS selectivity_5,
+       COUNT(DISTINCT LEFT(email, 10)) / COUNT(DISTINCT email) AS selectivity_10
+FROM users;</div><p><strong>方法2：使用完整索引（空间允许时）</strong></p></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>前缀长度从3调整为10后，选择性从0.02提升至0.95</li><li>查询性能显著提升</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例50 -->
+<div class="case-card" data-keywords="锁 间隙锁 范围查询">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">50</div>
+<div class="case-title-wrap"><div class="case-title">范围查询锁范围过大</div><div class="case-subtitle">库存扣减 — 间隙锁导致插入阻塞</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>秒杀活动，查询库存大于0的商品，对范围加锁。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM inventory WHERE stock > 0 FOR UPDATE;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>秒杀时大量用户同时下单，但插入新商品被阻塞</li><li>间隙锁锁住了(0, +∞)的范围</li><li>新商品无法添加，后台报锁等待超时</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：用单行锁替代范围锁（推荐）</strong></p><div class="code-block">SELECT id FROM inventory WHERE stock > 0 LIMIT 1;
+SELECT * FROM inventory WHERE id = ? FOR UPDATE;</div><p><strong>方法2：使用乐观锁</strong></p><div class="code-block">UPDATE inventory SET stock = stock - 1, version = version + 1
+WHERE id = ? AND stock > 0 AND version = ?;</div><p><strong>方法3：降级到RC隔离级别（权衡）</strong></p></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>单行锁不影响其他数据插入</li><li>系统并发能力提升</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例51 -->
+<div class="case-card" data-keywords="临时表 temporary memory">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">51</div>
+<div class="case-title-wrap"><div class="case-title">内存临时表转磁盘临时表</div><div class="case-subtitle">复杂排序 — 超出内存限制</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>报表查询需要GROUP BY和ORDER BY，临时表数据量大。</p></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>查询执行时间长</li><li>Created_tmp_disk_tables计数增加</li><li>tmp_table_size设置过小（16MB）</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：增大内存临时表限制（推荐）</strong></p><div class="code-block">SET GLOBAL tmp_table_size = 64 * 1024 * 1024;
+SET GLOBAL max_heap_table_size = 64 * 1024 * 1024;</div><p><strong>方法2：优化查询避免临时表</strong></p><p><strong>方法3：使用内存表引擎（特定场景）</strong></p></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>临时表留在内存，避免磁盘IO</li><li>查询提升2-3倍</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例52 -->
+<div class="case-card" data-keywords="索引 页分裂 碎片 optimize">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">52</div>
+<div class="case-title-wrap"><div class="case-title">索引碎片整理</div><div class="case-subtitle">频繁更新的表 — 空间膨胀查询慢</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>订单表频繁插入和删除，运行半年后表空间膨胀2倍，查询变慢。</p></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>SHOW TABLE STATUS显示Data_free很大</li><li>索引页碎片率高</li><li>逻辑行数100万，表文件500MB</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：OPTIMIZE TABLE（推荐）</strong></p><div class="code-block">OPTIMIZE TABLE orders;</div><p><strong>方法2：重建表（Online DDL）</strong></p><div class="code-block">ALTER TABLE orders ENGINE=InnoDB;</div><p><strong>方法3：定期维护计划</strong></p></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>表空间从500MB降至200MB</li><li>查询性能恢复</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例53 -->
+<div class="case-card" data-keywords="binlog 格式 row statement 主从">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">53</div>
+<div class="case-title-wrap"><div class="case-title">binlog格式选择影响主从一致性</div><div class="case-subtitle">STATEMENT模式导致数据不一致</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>使用STATEMENT格式binlog，包含UUID()、NOW()等函数的SQL导致主从数据不一致。</p></div>
+<div class="content-block"><h4>🔴 问题SQL示例</h4><div class="code-block">INSERT INTO logs (id, created_at) VALUES (UUID(), NOW());</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>主从数据校验发现不一致</li><li>STATEMENT格式记录SQL原文，从库重执行时函数值不同</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：改为ROW格式（推荐）</strong></p><div class="code-block">SET GLOBAL binlog_format = 'ROW';</div><p><strong>方法2：混合模式（MIXED）</strong></p><div class="code-block">SET GLOBAL binlog_format = 'MIXED';</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>ROW格式记录实际数据变化，主从完全一致</li><li>避免数据不一致问题</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例54 -->
+<div class="case-card" data-keywords="行格式 compact redundant 存储">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">54</div>
+<div class="case-title-wrap"><div class="case-title">行格式选择影响存储和性能</div><div class="case-subtitle">大字段表 — COMPACT vs DYNAMIC</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>文章表包含TEXT类型内容，使用COMPACT行格式，查询列表页慢。</p></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>COMPACT行格式下，长字段前768字节存在数据页</li><li>列表页只需要标题，却加载了大字段</li><li>Buffer Pool被大字段占满</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：改为DYNAMIC行格式（推荐）</strong></p><div class="code-block">ALTER TABLE articles ROW_FORMAT=DYNAMIC;</div><p><strong>方法2：拆分大字段到单独表</strong></p><div class="code-block">CREATE TABLE article_contents (article_id INT PRIMARY KEY, content LONGTEXT);</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>DYNAMIC格式大字段只存指针，数据页更小</li><li>列表页查询更快</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例55 -->
+<div class="case-card" data-keywords="double write buffer 双写 可靠性">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">55</div>
+<div class="case-title-wrap"><div class="case-title">Double Write Buffer对写入性能的影响</div><div class="case-subtitle">高并发写入 — 如何权衡安全与性能</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>高并发写入场景，希望提升写入性能。</p></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>Double Write Buffer增加一次磁盘写</li><li>SSD场景下部分写失效概率低</li><li>考虑是否可以关闭</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：保持开启（推荐）</strong></p><div class="highlight-box">Double Write对SSD影响已不大，建议保持开启，数据安全第一。</div><p><strong>方法2：使用Atomic Write（支持的原子写SSD）</strong></p><div class="code-block">SET GLOBAL innodb_doublewrite = 0;  -- 仅当SSD支持Atomic Write时</div></div>
+</div></div>
+</div>
+
+<!-- 案例56 -->
+<div class="case-card" data-keywords="change buffer 写缓冲 非唯一索引">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">56</div>
+<div class="case-title-wrap"><div class="case-title">Change Buffer提升非唯一索引写入</div><div class="case-subtitle">批量导入 — 利用写缓冲减少随机IO</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>批量导入数据到有多条非唯一索引的表，写入性能瓶颈。</p></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>每次INSERT需要更新多个索引</li><li>索引页可能不在Buffer Pool，产生随机读</li><li>Change Buffer可以延迟合并索引更新</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：确保Change Buffer开启（默认开启）</strong></p><div class="code-block">SHOW VARIABLES LIKE 'innodb_change_buffering';  -- all</div><p><strong>方法2：导入后手动刷脏页</strong></p><div class="code-block">SET GLOBAL innodb_io_capacity = 2000;</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>批量导入性能提升30-50%</li><li>减少随机IO</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例57 -->
+<div class="case-card" data-keywords="自适应哈希索引 AHI 内存">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">57</div>
+<div class="case-title-wrap"><div class="case-title">自适应哈希索引（AHI）的利用</div><div class="case-subtitle">热点数据 — 自动构建内存哈希索引</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>某商品被频繁查询，B+树索引查询路径长，希望更快。</p></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>某些查询的索引页被频繁访问</li><li>InnoDB自动在内存中为这些页构建哈希索引</li><li>AHI将B+树O(logN)降为O(1)</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：确保AHI开启（默认开启）</strong></p><div class="code-block">SHOW VARIABLES LIKE 'innodb_adaptive_hash_index';  -- ON</div><p><strong>方法2：监控AHI命中率</strong></p><div class="code-block">SHOW ENGINE INNODB STATUS;</div><p><strong>方法3：高并发竞争严重时关闭</strong></p><div class="code-block">SET GLOBAL innodb_adaptive_hash_index = OFF;</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>热点数据查询从O(logN)变为O(1)</li><li>提升约20-30%</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例58 -->
+<div class="case-card" data-keywords="buffer pool 缓冲池 预热">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">58</div>
+<div class="case-title-wrap"><div class="case-title">Buffer Pool大小配置不当</div><div class="case-subtitle">内存配置 — 过大导致OOM，过小缓存命中率低</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>数据库服务器64GB内存，Buffer Pool配了50GB，系统频繁OOM。</p></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>系统日志显示Out of Memory</li><li>MySQL内存占用持续增长</li><li>未给其他组件（连接、排序等）留足够内存</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：合理配置Buffer Pool（推荐）</strong></p><div class="code-block">SET GLOBAL innodb_buffer_pool_size = 40 * 1024 * 1024 * 1024;  -- 40GB</div><p><strong>方法2：启用多个Buffer Pool实例</strong></p><div class="code-block">SET GLOBAL innodb_buffer_pool_instances = 8;</div><p><strong>方法3：监控命中率</strong></p><div class="code-block">SHOW STATUS LIKE 'Innodb_buffer_pool_read_requests';
+SHOW STATUS LIKE 'Innodb_buffer_pool_reads';</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>系统稳定运行，不再OOM</li><li>Buffer Pool命中率保持95%+</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例59 -->
+<div class="case-card" data-keywords="redo log 日志 事务 性能">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">59</div>
+<div class="case-title-wrap"><div class="case-title">Redo Log大小影响写入吞吐</div><div class="case-subtitle">高并发写入 — 日志太小导致频繁刷盘</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>电商大促期间写入TPS很高，但Redo Log配置为默认48MB，成为瓶颈。</p></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>写入TPS上不去，磁盘IO高</li><li>Redo Log频繁切换，checkpoint频繁</li><li>脏页刷盘压力大</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：增大Redo Log（推荐）</strong></p><div class="code-block">SET GLOBAL innodb_log_file_size = 2 * 1024 * 1024 * 1024;  -- 2GB
+SET GLOBAL innodb_log_files_in_group = 3;
+-- 修改后需重启生效</div><p><strong>方法2：优化innodb_flush_log_at_trx_commit</strong></p><div class="code-block">SET GLOBAL innodb_flush_log_at_trx_commit = 2;</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>Redo Log切换频率降低</li><li>写入TPS提升2-3倍</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例60 -->
+<div class="case-card" data-keywords="flush 刷盘 脏页 checkpoint">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-medium">60</div>
+<div class="case-title-wrap"><div class="case-title">脏页刷盘策略调优</div><div class="case-subtitle">写入场景 — 避免抖动和尖峰IO</div></div>
+<span class="case-level level-medium">进阶</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>批量写入任务执行时，数据库出现周期性卡顿（抖动）。</p></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>监控显示周期性磁盘IO尖峰</li><li>InnoDB脏页积累到一定阈值集中刷盘</li><li>默认innodb_io_capacity对SSD来说太低</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：提升IO容量（SSD推荐）</strong></p><div class="code-block">SET GLOBAL innodb_io_capacity = 2000;
+SET GLOBAL innodb_io_capacity_max = 4000;</div><p><strong>方法2：调整脏页比例阈值</strong></p><div class="code-block">SET GLOBAL innodb_max_dirty_pages_pct = 75;
+SET GLOBAL innodb_max_dirty_pages_pct_lwm = 50;</div><p><strong>方法3：使用SSD+多个IO线程</strong></p><div class="code-block">SET GLOBAL innodb_read_io_threads = 8;
+SET GLOBAL innodb_write_io_threads = 8;</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>脏页刷盘更平滑，无尖峰</li><li>系统响应更稳定</li></ul></div>
+</div></div>
+</div>
+
+<!-- ==================== 高难篇 (61-100) ==================== -->
+<div class="section-title" id="hard"><span style="font-size:26px;margin-right:6px;">🔥</span>高难篇 (61-100) —— 架构级优化与复杂场景</div>
+
+<!-- 案例61 -->
+<div class="case-card" data-keywords="分库分表 全局ID 分布式事务">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">61</div>
+<div class="case-title-wrap"><div class="case-title">分库分表后跨分片聚合查询</div><div class="case-subtitle">订单系统 — 按用户ID分片后统计全平台订单</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>订单表按user_id%128分128张表，运营需要统计全平台日订单量。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT DATE(created_at) AS day, COUNT(*) FROM orders GROUP BY day;
+-- 需要扫描128张表</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>跨分片聚合需要汇总所有分片结果</li><li>中间件（ShardingSphere）在内存中归并</li><li>数据量大时中间件OOM</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：异构索引表/汇总表（推荐）</strong></p><div class="code-block">-- 建立订单统计汇总表，由消息队列异步更新
+CREATE TABLE order_daily_stats (stat_date DATE, order_count BIGINT, amount DECIMAL(18,2));</div><p><strong>方法2：数据仓库（OLAP）</strong></p><div class="code-block">-- 数据同步到ClickHouse/Doris进行聚合分析</div><p><strong>方法3：搜索引擎（ES）</strong></p><div class="code-block">-- 订单数据同步到Elasticsearch，利用其聚合能力</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>汇总表查询毫秒级</li><li>避免跨分片聚合的复杂性和性能问题</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例62 -->
+<div class="case-card" data-keywords="分布式事务 TCC Saga 最终一致">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">62</div>
+<div class="case-title-wrap"><div class="case-title">分布式事务下的数据一致性查询</div><div class="case-subtitle">电商下单 — 订单与库存跨服务</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>下单流程涉及订单服务、库存服务、账户服务，需要保证最终一致性。</p></div>
+<div class="content-block"><h4>🔴 问题</h4><p>订单创建成功但库存未扣减，用户查询时看到"已下单"但库存显示有货。</p></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>分布式事务未完成，查询看到中间状态</li><li>各服务数据存在时间窗口不一致</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：TCC模式（推荐）</strong></p><div class="code-block">-- Try: 预留库存
+-- Confirm: 确认扣减
+-- Cancel: 释放预留</div><p><strong>方法2：Saga模式</strong></p><div class="code-block">-- 长事务拆分为本地事务+补偿操作</div><p><strong>方法3：查询时处理不一致状态</strong></p><div class="code-block">-- 订单状态增加"处理中"，查询时对此状态做特殊展示</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>业务层面处理最终一致性</li><li>用户无感知数据不一致</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例63 -->
+<div class="case-card" data-keywords="读写分离 强制路由 主库">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">63</div>
+<div class="case-title-wrap"><div class="case-title">读写分离架构下的复杂查询优化</div><div class="case-subtitle">报表系统 — 需要实时数据的大屏</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>实时数据大屏需要展示今日订单量、GMV等，但读写分离下从库有延迟。</p></div>
+<div class="content-block"><h4>🔴 问题</h4><p>大屏数据与实际情况有几秒延迟，运营不满。</p></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>所有报表查询都走从库</li><li>主从延迟在1-3秒</li><li>实时性要求高的场景不能满足</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：实时指标走主库（推荐）</strong></p><div class="code-block">-- 关键实时指标强制路由到主库
+SELECT /*+ MASTER */ COUNT(*) FROM orders WHERE created_at >= CURDATE();</div><p><strong>方法2：独立统计库</strong></p><div class="code-block">-- 独立部署实时统计实例，直接写主库</div><p><strong>方法3：流式计算（Flink）</strong></p><div class="code-block">-- 使用Flink实时计算指标，写入Redis/HBase</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>实时指标延迟从秒级降至毫秒级</li><li>大屏数据与实际一致</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例64 -->
+<div class="case-card" data-keywords="热点行 锁竞争 并发更新">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">64</div>
+<div class="case-title-wrap"><div class="case-title">热点行更新导致性能瓶颈</div><div class="case-subtitle">秒杀库存 — 千万并发扣减同一商品</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>秒杀活动，100万人同时抢购同一款手机，库存只有1000台。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">UPDATE inventory SET stock = stock - 1 WHERE product_id = 1 AND stock > 0;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>单条记录被大量并发更新，行锁竞争严重</li><li>大量请求等待锁，连接池耗尽</li><li>TPS上不去，用户体验差</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：库存分段（推荐）</strong></p><div class="code-block">-- 将1000库存分为10段，每段100
+UPDATE inventory SET stock = stock - 1 
+WHERE product_id = 1 AND segment = rand() % 10 AND stock > 0;</div><p><strong>方法2：Redis预扣减</strong></p><div class="code-block">-- Redis原子扣减，成功后异步同步到MySQL
+DECR stock:product:1</div><p><strong>方法3：消息队列异步处理</strong></p><div class="code-block">-- 用户请求先入队，后台异步扣减</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>库存分段后锁竞争降低90%</li><li>TPS从1000提升至50000</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例65 -->
+<div class="case-card" data-keywords="全文检索 搜索引擎 模糊查询">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">65</div>
+<div class="case-title-wrap"><div class="case-title">复杂搜索场景引入搜索引擎</div><div class="case-subtitle">商品搜索 — 多条件组合+分词+排序</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>商品搜索支持关键词分词、多属性筛选、价格区间、排序等复杂条件。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM products 
+WHERE name LIKE '%手机%' AND category_id = 3 AND price BETWEEN 1000 AND 5000
+ORDER BY sales DESC LIMIT 20;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>LIKE '%手机%'无法走索引</li><li>多条件组合查询索引选择困难</li><li>排序+分页性能差</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：引入Elasticsearch（推荐）</strong></p><div class="code-block">-- 商品数据同步到ES
+-- 搜索请求直接查ES，毫秒级响应</div><p><strong>方法2：MySQL全文索引（简单场景）</strong></p><div class="code-block">CREATE FULLTEXT INDEX idx_name ON products(name);
+SELECT * FROM products WHERE MATCH(name) AGAINST('手机');</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>ES搜索毫秒级响应</li><li>支持复杂分词和聚合</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例66 -->
+<div class="case-card" data-keywords="时序数据库 归档 冷热分离">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">66</div>
+<div class="case-title-wrap"><div class="case-title">时序数据的冷热分离</div><div class="case-subtitle">监控系统 — 海量指标数据存储与查询</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>IoT设备监控系统，每天产生10亿条时序数据，需要保留1年。</p></div>
+<div class="content-block"><h4>🔴 问题</h4><p>MySQL单表无法承受如此数据量，查询和写入性能急剧下降。</p></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>单表数据量超过1亿后性能断崖式下降</li><li>时间范围查询需要扫描大量数据</li><li>存储成本极高</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：引入时序数据库（推荐）</strong></p><div class="code-block">-- 使用InfluxDB/TDengine等时序数据库
+-- 按时间自动分区，高效压缩</div><p><strong>方法2：MySQL分区+归档</strong></p><div class="code-block">-- 按天分区，7天前数据归档到对象存储</div><p><strong>方法3：冷热分离架构</strong></p><div class="code-block">-- 热数据（7天）在MySQL/Redis
+-- 冷数据在HBase/S3，Presto查询</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>时序数据库存储降低10倍</li><li>查询性能提升100倍</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例67 -->
+<div class="case-card" data-keywords="大表DDL online DDL gh-ost pt-osc">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">67</div>
+<div class="case-title-wrap"><div class="case-title">亿级表在线加字段</div><div class="case-subtitle">订单表 — 需要新增业务字段</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>2亿订单表需要新增source_channel字段，业务不能停。</p></div>
+<div class="content-block"><h4>🔴 问题</h4><p>直接ALTER TABLE会锁表，影响线上业务。</p></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>MySQL原生DDL会锁表（5.6前）</li><li>5.6+ Online DDL仍有短暂元数据锁</li><li>大表DDL可能需要数小时</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：gh-ost（推荐）</strong></p><div class="code-block">gh-ost --host=localhost --database=orders --table=orders 
+  --alter="ADD COLUMN source_channel VARCHAR(20)" 
+  --execute</div><p><strong>方法2：pt-online-schema-change</strong></p><div class="code-block">pt-online-schema-change --alter "ADD COLUMN source_channel VARCHAR(20)" 
+  D=orders,t=orders --execute</div><p><strong>方法3：MySQL 8.0 Instant ADD COLUMN</strong></p><div class="code-block">ALTER TABLE orders ADD COLUMN source_channel VARCHAR(20), ALGORITHM=INSTANT;</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>gh-ost在线DDL，业务零感知</li><li>可控制负载，随时暂停/恢复</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例68 -->
+<div class="case-card" data-keywords="数据迁移 不停机 双写">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">68</div>
+<div class="case-title-wrap"><div class="case-title">不停机数据迁移</div><div class="case-subtitle">用户表 — 从单库迁移到分库分表</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>用户表从单库单表迁移到分库分表，业务不能停。</p></div>
+<div class="content-block"><h4>🔴 问题</h4><p>如何在不停止服务的情况下，将存量数据迁移到新架构？</p></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>直接停机迁移影响用户体验</li><li>双写期间数据一致性难以保证</li><li>回滚方案需要考虑</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：双写+增量同步（推荐）</strong></p><div class="code-block">-- 阶段1：开启双写（写旧库+新库）
+-- 阶段2：存量数据迁移（Canal/DataX）
+-- 阶段3：校验数据一致性
+-- 阶段4：切读流量到新库
+-- 阶段5：停止写旧库</div><p><strong>方法2：Canal实时同步</strong></p><div class="code-block">-- Canal解析binlog，实时同步到新库</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>业务零停机完成迁移</li><li>可随时回滚</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例69 -->
+<div class="case-card" data-keywords="SQL注入 安全 参数化">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">69</div>
+<div class="case-title-wrap"><div class="case-title">SQL注入漏洞与性能影响</div><div class="case-subtitle">安全优化 — 动态拼接SQL被攻击</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>搜索接口使用字符串拼接SQL，被注入攻击导致全表删除。</p></div>
+<div class="content-block"><h4>🔴 问题代码</h4><div class="code-block">String sql = "SELECT * FROM users WHERE name = '" + name + "'";
+// 攻击者传入: '; DROP TABLE users; --</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>被注入后数据库表被删除</li><li>拼接SQL无法利用查询缓存</li><li>每次SQL都是新的，需要重新解析</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：参数化查询/预编译（推荐）</strong></p><div class="code-block">PreparedStatement ps = conn.prepareStatement(
+    "SELECT * FROM users WHERE name = ?");
+ps.setString(1, name);</div><p><strong>方法2：ORM框架</strong></p><div class="code-block">// MyBatis/JPA自动使用参数化查询</div><p><strong>方法3：输入校验</strong></p><div class="code-block">// 白名单校验，拒绝特殊字符</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>彻底杜绝SQL注入</li><li>预编译SQL可复用执行计划</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例70 -->
+<div class="case-card" data-keywords="查询重写 规则引擎 优化器">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">70</div>
+<div class="case-title-wrap"><div class="case-title">复杂查询自动重写优化</div><div class="case-subtitle">BI系统 — 用户自定义SQL查询</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>BI系统允许分析师写自定义SQL，但用户写的SQL往往性能很差。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM (
+  SELECT * FROM orders WHERE status = 'paid'
+) t WHERE t.amount > 100;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>用户写的SQL有各种反模式</li><li>子查询嵌套、SELECT *、无索引等</li><li>无法逐个教育用户</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：SQL重写引擎（推荐）</strong></p><div class="code-block">-- 在应用层增加SQL解析和重写模块
+-- 使用Druid/JSqlParser解析SQL
+-- 自动应用优化规则：子查询提升、*展开等</div><p><strong>方法2：限制SQL语法</strong></p><div class="code-block">-- 只允许通过可视化拖拽生成SQL</div><p><strong>方法3：查询审核</strong></p><div class="code-block">-- SQL执行前必须经过审核系统（如Yearning）</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>自动重写后性能提升10-100倍</li><li>减少DBA人工审核工作量</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例71 -->
+<div class="case-card" data-keywords="递归查询 CTE 树形结构">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">71</div>
+<div class="case-title-wrap"><div class="case-title">递归查询树形结构性能优化</div><div class="case-subtitle">组织架构 — 查询部门下所有员工</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>组织架构是多层树形结构，需要查询某部门下的所有子部门及员工。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">-- 递归CTE查询（MySQL 8.0+）
+WITH RECURSIVE dept_tree AS (
+    SELECT id, name, parent_id FROM departments WHERE id = 1
+    UNION ALL
+    SELECT d.id, d.name, d.parent_id FROM departments d
+    JOIN dept_tree dt ON d.parent_id = dt.id
+)
+SELECT * FROM dept_tree;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>递归CTE每层都是一个JOIN</li><li>层级深时性能指数级下降</li><li>无合适索引支持递归</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：路径枚举（推荐）</strong></p><div class="code-block">-- 增加path字段：/1/2/5/8/
+SELECT * FROM departments WHERE path LIKE '/1/%';</div><p><strong>方法2：嵌套集模型</strong></p><div class="code-block">-- 增加left_val和right_val，范围查询</div><p><strong>方法3：闭包表</strong></p><div class="code-block">-- 单独维护祖先-后代关系表</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>路径枚举查询从秒级降至毫秒级</li><li>无需递归</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例72 -->
+<div class="case-card" data-keywords="JSON 字段 虚拟列 索引">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">72</div>
+<div class="case-title-wrap"><div class="case-title">JSON字段查询优化</div><div class="case-subtitle">商品属性 — 灵活 Schema 设计</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>商品属性存储在JSON字段中，需要按属性查询（如颜色=红色）。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT * FROM products WHERE JSON_EXTRACT(attrs, '$.color') = 'red';</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>JSON_EXTRACT无法直接使用普通索引</li><li>全表扫描解析JSON</li><li>查询性能差</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：虚拟列+索引（推荐）</strong></p><div class="code-block">ALTER TABLE products ADD color VARCHAR(20) 
+  AS (JSON_UNQUOTE(JSON_EXTRACT(attrs, '$.color'))) VIRTUAL;
+CREATE INDEX idx_color ON products(color);</div><p><strong>方法2：多值索引（MySQL 8.0.17+）</strong></p><div class="code-block">CREATE INDEX idx_tags ON products((CAST(attrs->"$.tags" AS CHAR(255) ARRAY)));</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>虚拟列索引后查询命中</li><li>性能提升100倍</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例73 -->
+<div class="case-card" data-keywords="物化视图 汇总表 实时计算">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">73</div>
+<div class="case-title-wrap"><div class="case-title">实时物化视图替代复杂聚合</div><div class="case-subtitle">实时大屏 — 订单实时统计</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>实时大屏展示今日订单数、GMV、客单价等，每5秒刷新。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT COUNT(*), SUM(amount), AVG(amount) 
+FROM orders WHERE created_at >= CURDATE();</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>每5秒执行一次全量聚合</li><li>订单量越大查询越慢</li><li>高峰期查询超时</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：增量汇总表（推荐）</strong></p><div class="code-block">CREATE TABLE order_realtime_stats (
+    stat_date DATE, hour INT, order_count BIGINT, 
+    total_amount DECIMAL(18,2), PRIMARY KEY (stat_date, hour)
+);
+-- 应用层写入时同步更新汇总表</div><p><strong>方法2：Flink实时计算</strong></p><div class="code-block">-- Flink消费binlog，实时计算指标写入Redis</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>汇总表查询毫秒级</li><li>与订单量无关，性能稳定</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例74 -->
+<div class="case-card" data-keywords="列式存储 OLAP 分析型查询">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">74</div>
+<div class="case-title-wrap"><div class="case-title">分析型查询引入列式数据库</div><div class="case-subtitle">数据仓库 — 多维度聚合分析</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>BI系统需要按时间、地区、品类、用户画像等多维度分析订单。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT region, category, COUNT(*), SUM(amount), AVG(amount)
+FROM orders o JOIN users u ON o.user_id = u.id
+WHERE o.created_at >= '2024-01-01'
+GROUP BY region, category;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>MySQL行式存储不适合大规模聚合</li><li>多表JOIN+GROUP BY性能差</li><li>分析查询影响TP业务</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：ClickHouse/Doris（推荐）</strong></p><div class="code-block">-- 数据同步到ClickHouse
+-- 列式存储+向量化执行，聚合快100倍</div><p><strong>方法2：TiDB（HTAP）</strong></p><div class="code-block">-- 一份数据同时支持TP和AP</div><p><strong>方法3：预聚合Cube</strong></p><div class="code-block">-- Kylin/Druid预计算多维Cube</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>分析查询从分钟级降至秒级</li><li>不影响在线业务</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例75 -->
+<div class="case-card" data-keywords="缓存一致性 缓存穿透 缓存击穿">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">75</div>
+<div class="case-title-wrap"><div class="case-title">缓存与数据库一致性优化</div><div class="case-subtitle">商品详情 — 高并发下缓存同步</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>商品详情页使用Redis缓存，高并发下缓存与数据库不一致。</p></div>
+<div class="content-block"><h4>🔴 问题</h4><p>库存扣减后Redis未更新，用户看到旧库存。</p></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>先更新DB再删缓存，中间有时间窗口</li><li>并发下多个请求同时更新</li><li>缓存穿透导致DB压力增大</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：Cache Aside + 延迟双删（推荐）</strong></p><div class="code-block">// 1. 删缓存
+// 2. 更新DB
+// 3. 延迟500ms再删缓存（异步）</div><p><strong>方法2：Binlog监听（Canal）</strong></p><div class="code-block">-- Canal监听binlog，数据变更后自动更新缓存</div><p><strong>方法3：分布式锁</strong></p><div class="code-block">-- 更新时加分布式锁，保证串行</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>最终一致性，缓存命中率高</li><li>DB压力降低90%</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例76 -->
+<div class="case-card" data-keywords="并行查询 多线程 分区并行">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">76</div>
+<div class="case-title-wrap"><div class="case-title">大查询并行化优化</div><div class="case-subtitle">年报统计 — 全年数据聚合</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>年度财务报表需要汇总全年10亿条订单数据。</p></div>
+<div class="content-block"><h4>🔴 问题SQL</h4><div class="code-block">SELECT MONTH(created_at), COUNT(*), SUM(amount) 
+FROM orders WHERE created_at >= '2024-01-01'
+GROUP BY MONTH(created_at);</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>单线程扫描10亿数据</li><li>CPU单核跑满，其他核空闲</li><li>查询需要数分钟</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：MySQL 8.0并行查询（推荐）</strong></p><div class="code-block">SET SESSION innodb_parallel_read_threads = 8;</div><p><strong>方法2：应用层并行</strong></p><div class="code-block">-- 按月份拆分为12个子查询，多线程并行执行
+-- 最后汇总结果</div><p><strong>方法3：ClickHouse并行</strong></p><div class="code-block">-- ClickHouse天然支持多核并行</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>并行查询后利用多核CPU</li><li>查询从5分钟降至30秒</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例77 -->
+<div class="case-card" data-keywords="读写分离 延迟 强制主库 事务">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">77</div>
+<div class="case-title-wrap"><div class="case-title">事务内读写一致性保障</div><div class="case-subtitle">转账场景 — 事务内读不到最新数据</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>转账事务：扣款后查询余额，但走了从库读不到刚扣的款。</p></div>
+<div class="content-block"><h4>🔴 问题</h4><div class="code-block">BEGIN;
+UPDATE account SET balance = balance - 100 WHERE id = 1;  -- 写主库
+SELECT balance FROM account WHERE id = 1;  -- 读从库，可能还是旧值
+COMMIT;</div></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>事务内写后读，从库延迟导致不一致</li><li>业务逻辑错误，用户余额显示不对</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：事务内强制读主库（推荐）</strong></p><div class="code-block">-- 框架层识别：若当前在事务中，读请求路由到主库</div><p><strong>方法2：读写都在主库</strong></p><div class="code-block">-- 事务内所有操作走主库，事务外走从库</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>事务内读写一致</li><li>业务逻辑正确</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例78 -->
+<div class="case-card" data-keywords="数据库中间件 ShardingProxy 路由">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">78</div>
+<div class="case-title-wrap"><div class="case-title">分库分表中间件选型与优化</div><div class="case-subtitle">架构升级 — 选择合适的中间件</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>单库无法支撑业务，需要分库分表，选择中间件方案。</p></div>
+<div class="content-block"><h4>🔍 分析过程</h4><ul><li>ShardingSphere-JDBC：客户端，性能最好，但侵入代码</li><li>ShardingSphere-Proxy：服务端，对应用透明，有网络开销</li><li>MyCAT：老牌中间件，社区活跃但更新慢</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：ShardingSphere-JDBC（性能优先）</strong></p><div class="code-block">-- Java应用直接引入jar，SQL解析在客户端</div><p><strong>方法2：ShardingSphere-Proxy（运维优先）</strong></p><div class="code-block">-- 独立部署，多语言应用共用</div><p><strong>方法3：TiDB（不想分库分表）</strong></p><div class="code-block">-- 分布式数据库，自动分片，对应用透明</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>根据场景选择合适方案</li><li>性能与维护性平衡</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例79 -->
+<div class="case-card" data-keywords="数据库 压测 性能测试 瓶颈">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">79</div>
+<div class="case-title-wrap"><div class="case-title">数据库性能压测与瓶颈定位</div><div class="case-subtitle">大促准备 — 评估数据库容量</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>双十一前需要评估数据库能否支撑10倍流量。</p></div>
+<div class="content-block"><h4>🔍 压测过程</h4><ul><li>使用sysbench进行基准测试</li><li>模拟真实业务场景压测</li><li>监控CPU/IO/连接数/锁等待等指标</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：sysbench基准测试（推荐）</strong></p><div class="code-block">sysbench oltp_read_write --mysql-host=localhost 
+  --mysql-user=root --mysql-password=xxx --mysql-db=test 
+  --tables=10 --table-size=1000000 --threads=64 
+  --time=300 --report-interval=10 run</div><p><strong>方法2：全链路压测</strong></p><div class="code-block">-- 生产环境影子库压测</div><p><strong>方法3：瓶颈定位</strong></p><div class="code-block">-- pt-query-digest分析慢查询
+-- performance_schema分析锁等待</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>提前发现性能瓶颈</li><li>为扩容提供数据支撑</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例80 -->
+<div class="case-card" data-keywords="数据库 容灾 备份 恢复">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">80</div>
+<div class="case-title-wrap"><div class="case-title">数据库备份恢复策略优化</div><div class="case-subtitle">数据安全 — 亿级数据快速恢复</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>2亿订单表，mysqldump备份需要4小时，恢复需要8小时，无法满足RTO。</p></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>逻辑备份（mysqldump）单线程，速度慢</li><li>恢复时需要逐条执行SQL</li><li>大表恢复时间不可接受</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：物理备份（XtraBackup，推荐）</strong></p><div class="code-block">xtrabackup --backup --target-dir=/backup/
+xtrabackup --prepare --target-dir=/backup/</div><p><strong>方法2：增量备份</strong></p><div class="code-block">-- 周日全量，周一至周六增量</div><p><strong>方法3：Binlog实时备份</strong></p><div class="code-block">-- 可恢复到任意时间点（PITR）</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>物理备份从4小时降至30分钟</li><li>恢复从8小时降至1小时</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例81 -->
+<div class="case-card" data-keywords="数据库 监控 告警 慢查询">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">81</div>
+<div class="case-title-wrap"><div class="case-title">数据库智能监控与告警</div><div class="case-subtitle">运维体系 — 提前发现潜在问题</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>建立数据库监控体系，提前发现性能问题和潜在风险。</p></div>
+<div class="content-block"><h4>🔍 监控维度</h4><ul><li>QPS/TPS、连接数、活跃线程</li><li>InnoDB Buffer Pool命中率、锁等待</li><li>慢查询、错误日志、主从延迟</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：Prometheus + Grafana（推荐）</strong></p><div class="code-block">-- mysqld_exporter采集MySQL指标
+-- Grafana配置Dashboard和告警规则</div><p><strong>方法2：PMM（Percona Monitoring）</strong></p><div class="code-block">-- 开箱即用的MySQL监控方案</div><p><strong>方法3：自建采集</strong></p><div class="code-block">-- 采集SHOW GLOBAL STATUS、performance_schema数据</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>问题从被动发现变主动预警</li><li>MTTR（平均恢复时间）降低80%</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例82 -->
+<div class="case-card" data-keywords="参数调优 配置文件 my.cnf">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">82</div>
+<div class="case-title-wrap"><div class="case-title">MySQL参数体系化调优</div><div class="case-subtitle">性能调优 — 从默认配置到生产级</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>新部署的MySQL使用默认配置，性能无法满足生产需求。</p></div>
+<div class="content-block"><h4>🔍 需要调优的参数</h4><ul><li>innodb_buffer_pool_size：缓冲池大小</li><li>innodb_log_file_size：redo日志大小</li><li>max_connections：最大连接数</li><li>innodb_flush_log_at_trx_commit：刷盘策略</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：使用自动调优工具（推荐）</strong></p><div class="code-block">-- MySQLTuner-perl脚本分析并给出建议
+perl mysqltuner.pl --host localhost --user root --pass xxx</div><p><strong>方法2：参考生产模板</strong></p><div class="code-block">-- 根据CPU/内存/磁盘类型选择配置模板
+-- SSD配置 vs HDD配置不同</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>默认配置到调优后性能提升3-5倍</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例83 -->
+<div class="case-card" data-keywords="SQL审核 规范 质量 gate">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">83</div>
+<div class="case-title-wrap"><div class="case-title">SQL质量管控体系</div><div class="case-subtitle">研发流程 — 防止烂SQL上线</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>线上频繁出现慢SQL，根因是研发提交的SQL质量差。</p></div>
+<div class="content-block"><h4>🔍 问题根因</h4><ul><li>无SQL审核流程</li><li>研发不了解索引和优化</li><li>测试数据量小，问题未暴露</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：SQL审核工具（推荐）</strong></p><div class="code-block">-- Yearning/Archery等审核平台
+-- 自动检测：SELECT *、无WHERE、索引缺失等</div><p><strong>方法2：CI/CD集成</strong></p><div class="code-block">-- 代码提交时自动审核SQL文件
+-- 不通过则阻断发布</div><p><strong>方法3：SQL规范培训</strong></p><div class="code-block">-- 制定团队SQL编写规范
+-- 定期分享优化案例</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>线上慢SQL减少90%</li><li>DBA审核工作量大幅降低</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例84 -->
+<div class="case-card" data-keywords="数据脱敏 安全 隐私 加密">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">84</div>
+<div class="case-title-wrap"><div class="case-title">敏感数据查询的脱敏与加密</div><div class="case-subtitle">用户隐私 — 手机号身份证脱敏查询</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>客服系统需要查询用户信息，但不能展示完整手机号和身份证。</p></div>
+<div class="content-block"><h4>🔴 问题</h4><p>直接在SQL中处理脱敏影响性能，应用层处理增加复杂度。</p></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：MySQL视图脱敏（推荐）</strong></p><div class="code-block">CREATE VIEW users_safe AS
+SELECT id, name,
+CONCAT(LEFT(phone,3),'****',RIGHT(phone,4)) AS phone,
+CONCAT(LEFT(id_card,6),'********',RIGHT(id_card,4)) AS id_card
+FROM users;</div><p><strong>方法2：透明数据加密（TDE）</strong></p><div class="code-block">-- InnoDB透明加密，数据文件加密存储</div><p><strong>方法3：应用层加密</strong></p><div class="code-block">-- 敏感字段加密后存储，查询后解密</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>视图脱敏对应用透明</li><li>满足数据安全合规</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例85 -->
+<div class="case-card" data-keywords="多租户 隔离 资源限制">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">85</div>
+<div class="case-title-wrap"><div class="case-title">多租户数据库资源隔离</div><div class="case-subtitle">SaaS系统 — 不同租户共享数据库</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>SaaS系统多租户共享数据库，某租户大数据查询影响其他租户。</p></div>
+<div class="content-block"><h4>🔴 问题</h4><p>租户A的全表扫描导致租户B的简单查询变慢。</p></div>
+<div class="content-block"><h4>🔍 发现过程</h4><ul><li>多租户共享资源无隔离</li><li>慢查询占用大量CPU和IO</li><li>无法定位是哪个租户的问题</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：资源组隔离（MySQL 8.0+，推荐）</strong></p><div class="code-block">CREATE RESOURCE GROUP small_queries 
+  TYPE = USER VCPU = 0-3 THREAD_PRIORITY = 19;
+CREATE RESOURCE GROUP big_queries 
+  TYPE = USER VCPU = 4-7 THREAD_PRIORITY = 0;</div><p><strong>方法2：独立数据库实例</strong></p><div class="code-block">-- 大客户独立实例，小客户共享</div><p><strong>方法3：连接池限流</strong></p><div class="code-block">-- 按租户限制最大并发连接数</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>租户间资源隔离，互不影响</li><li>问题定位更清晰</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例86 -->
+<div class="case-card" data-keywords="数据库 审计 合规 GDPR">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">86</div>
+<div class="case-title-wrap"><div class="case-title">数据库审计与合规</div><div class="case-subtitle">数据治理 — 操作留痕满足合规</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>需要记录所有数据库操作，满足等保/GDPR合规要求。</p></div>
+<div class="content-block"><h4>🔍 需求</h4><ul><li>记录谁在什么时间做了什么操作</li><li>谁查看了敏感数据</li><li>谁修改了关键数据</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：MySQL Audit Log（推荐）</strong></p><div class="code-block">INSTALL PLUGIN audit_log SONAME 'audit_log.so';
+SET GLOBAL audit_log_policy = 'ALL';</div><p><strong>方法2：general_log</strong></p><div class="code-block">SET GLOBAL general_log = ON;
+-- 性能开销大，不推荐生产长期开启</div><p><strong>方法3：数据库防火墙（DBFirewall）</strong></p><div class="code-block">-- 独立审计设备，解析网络流量</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>所有操作可追溯</li><li>满足合规审计要求</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例87 -->
+<div class="case-card" data-keywords="数据库 容量规划 扩容 预测">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">87</div>
+<div class="case-title-wrap"><div class="case-title">数据库容量规划与预测</div><div class="case-subtitle">架构规划 — 提前半年规划扩容</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>业务快速增长，需要提前规划数据库扩容。</p></div>
+<div class="content-block"><h4>🔍 需要监控的指标</h4><ul><li>数据量增长趋势（GB/月）</li><li>QPS/TPS增长趋势</li><li>连接数峰值</li><li>磁盘IO利用率</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：建立容量模型（推荐）</strong></p><div class="code-block">-- 当前QPS=10000，CPU=50%，预计半年后QPS=30000
+-- 需要扩容至6核（线性估算）</div><p><strong>方法2：定期容量评审</strong></p><div class="code-block">-- 每月评审容量数据
+-- 提前3个月发起扩容申请</div><p><strong>方法3：自动扩容（云数据库）</strong></p><div class="code-block">-- 阿里云RDS自动扩容
+-- 达到阈值自动升配</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>避免突发容量不足</li><li>扩容有序进行</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例88 -->
+<div class="case-card" data-keywords="数据库 高可用 MHA MGR">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">88</div>
+<div class="case-title-wrap"><div class="case-title">数据库高可用架构选型</div><div class="case-subtitle">核心系统 — 秒级故障切换</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>支付核心数据库需要99.99%可用性，故障切换时间<30秒。</p></div>
+<div class="content-block"><h4>🔍 方案对比</h4><ul><li>MHA：成熟稳定，但可能有脑裂</li><li>MGR：官方高可用，自动故障检测，强一致</li><li>主从+keepalived：简单，但切换不自动</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：MySQL Group Replication（推荐）</strong></p><div class="code-block">-- 3节点MGR，自动选主
+-- 单主模式写，多主模式读</div><p><strong>方法2：MHA + VIP</strong></p><div class="code-block">-- 经典方案，社区成熟</div><p><strong>方法3：云数据库高可用版</strong></p><div class="code-block">-- 阿里云RDS高可用版，自动切换</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>MGR自动切换时间<10秒</li><li>数据零丢失</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例89 -->
+<div class="case-card" data-keywords="数据库 压测 影子库 全链路">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">89</div>
+<div class="case-title-wrap"><div class="case-title">生产环境影子库压测</div><div class="case-subtitle">大促准备 — 真实流量压测</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>需要在生产环境验证数据库能否支撑大促流量，但不能影响真实业务。</p></div>
+<div class="content-block"><h4>🔍 方案设计</h4><ul><li>复制生产库为影子库</li><li>复制生产流量到影子库</li><li>影子库压测不影响真实用户</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：流量复制（推荐）</strong></p><div class="code-block">-- 使用TCPCopy/GoReplay复制流量
+-- 影子库独立部署，压测数据隔离</div><p><strong>方法2：影子表</strong></p><div class="code-block">-- 同一实例，影子表名前缀
+-- 资源隔离性差，简单场景可用</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>真实流量验证，结果可信</li><li>不影响线上业务</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例90 -->
+<div class="case-card" data-keywords="数据库 自动化 运维 DBA">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">90</div>
+<div class="case-title-wrap"><div class="case-title">数据库自动化运维平台</div><div class="case-subtitle">DevOps — 减少人工运维</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>DBA日常需要处理大量重复工作：建库、授权、备份、告警处理。</p></div>
+<div class="content-block"><h4>🔍 痛点</h4><ul><li>人工操作容易出错</li><li>审批流程长</li><li>标准化程度低</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：自助运维平台（推荐）</strong></p><div class="code-block">-- 研发自助申请：库、表、索引、账号
+-- 自动审核+人工复核</div><p><strong>方法2：自动化变更</strong></p><div class="code-block">-- 使用gh-ost/pt-osc自动执行DDL
+-- 自动备份+回滚能力</div><p><strong>方法3：智能诊断</strong></p><div class="code-block">-- 自动分析慢SQL并推荐优化方案</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>DBA效率提升5倍</li><li>人为事故降低90%</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例91 -->
+<div class="case-card" data-keywords="数据库 云原生 Kubernetes 容器">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">91</div>
+<div class="case-title-wrap"><div class="case-title">数据库云原生部署</div><div class="case-subtitle">K8s — MySQL容器化部署</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>将MySQL部署到Kubernetes，实现弹性伸缩和自动化运维。</p></div>
+<div class="content-block"><h4>🔍 挑战</h4><ul><li>容器重启后数据持久化</li><li>主从复制在K8s中的服务发现</li><li>存储性能（本地盘vs网络存储）</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：StatefulSet + PVC（推荐）</strong></p><div class="code-block">-- 使用StatefulSet保证Pod顺序和稳定网络标识
+-- PVC保证数据持久化</div><p><strong>方法2：Operator模式</strong></p><div class="code-block">-- 使用MySQL Operator管理生命周期
+-- 自动备份、恢复、故障切换</div><p><strong>方法3：云托管数据库</strong></p><div class="code-block">-- 阿里云PolarDB/腾讯云TDSQL</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>基础设施即代码</li><li>部署效率提升10倍</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例92 -->
+<div class="case-card" data-keywords="数据库 成本 降本 存储">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">92</div>
+<div class="case-title-wrap"><div class="case-title">数据库存储成本优化</div><div class="case-subtitle">降本增效 — 百TB数据成本控制</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>日志表数据量达100TB，存储成本每月数万元。</p></div>
+<div class="content-block"><h4>🔍 分析</h4><ul><li>冷数据（1年前）占80%</li><li>热数据需要SSD高性能</li><li>压缩率低</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：冷热分层（推荐）</strong></p><div class="code-block">-- 热数据：SSD本地盘
+-- 温数据：SAS盘
+-- 冷数据：对象存储（OSS/S3）</div><p><strong>方法2：数据压缩</strong></p><div class="code-block">-- InnoDB透明压缩（zlib/lz4/zstd）</div><p><strong>方法3：归档删除</strong></p><div class="code-block">-- 3年前数据归档后删除</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>存储成本降低70%</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例93 -->
+<div class="case-card" data-keywords="数据库 迁移 上云 下云">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">93</div>
+<div class="case-title-wrap"><div class="case-title">数据库上云迁移</div><div class="case-subtitle">IDC迁云 — 自建MySQL迁到RDS</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>公司决定将自建IDC的MySQL迁移到阿里云RDS。</p></div>
+<div class="content-block"><h4>🔍 迁移步骤</h4><ul><li>评估：数据量、QPS、特殊功能依赖</li><li>准备：RDS实例创建、网络打通</li><li>迁移：DTS数据传输服务</li><li>验证：数据一致性校验</li><li>切换：业务流量切换到RDS</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：DTS不停机迁移（推荐）</strong></p><div class="code-block">-- 阿里云DTS：结构迁移+全量迁移+增量同步
+-- 业务零停机</div><p><strong>方法2：自建主从+切换</strong></p><div class="code-block">-- RDS作为从库，同步后切主</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>业务零停机完成迁移</li><li>享受云数据库托管服务</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例94 -->
+<div class="case-card" data-keywords="数据库 混沌工程 故障演练">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">94</div>
+<div class="case-title-wrap"><div class="case-title">数据库故障演练</div><div class="case-subtitle">混沌工程 — 验证系统韧性</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>定期演练数据库故障，验证系统容错能力。</p></div>
+<div class="content-block"><h4>🔍 演练场景</h4><ul><li>主库宕机，自动切换是否正常</li><li>网络分区，是否脑裂</li><li>慢查询导致连接池耗尽</li><li>磁盘满导致写失败</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：ChaosBlade（推荐）</strong></p><div class="code-block">-- 模拟数据库延迟、丢包、宕机
+blade create mysql delay --time 500ms --sql SELECT</div><p><strong>方法2：手工演练</strong></p><div class="code-block">-- 手工kill主库进程，观察切换</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>提前发现容灾漏洞</li><li>团队熟悉故障处理流程</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例95 -->
+<div class="case-card" data-keywords="数据库 机器学习 智能优化">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">95</div>
+<div class="case-title-wrap"><div class="case-title">基于AI的数据库参数自动调优</div><div class="case-subtitle">智能运维 — OtterTune类似方案</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>数据库参数众多（300+），人工调优困难，希望AI自动调优。</p></div>
+<div class="content-block"><h4>🔍 原理</h4><ul><li>收集数据库workload特征</li><li>建立参数-性能模型</li><li>推荐最优参数组合</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：阿里云RDS自动调参（推荐）</strong></p><div class="code-block">-- 云数据库内置AI调参</div><p><strong>方法2：开源方案</strong></p><div class="code-block">-- OtterTune（CMU开源）
+-- CDBTune（腾讯开源）</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>参数调优时间从周降至小时</li><li>性能提升20-50%</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例96 -->
+<div class="case-card" data-keywords="数据库 向量检索 AI 语义搜索">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">96</div>
+<div class="case-title-wrap"><div class="case-title">向量数据库实现语义搜索</div><div class="case-subtitle">AI应用 — 商品以图搜图</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>用户上传图片搜索相似商品，传统SQL无法实现。</p></div>
+<div class="content-block"><h4>🔍 技术方案</h4><ul><li>图片通过模型提取特征向量（512维）</li><li>向量相似度检索</li><li>传统数据库无法高效支持</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：专用向量数据库（推荐）</strong></p><div class="code-block">-- Milvus/Pinecone/Weaviate
+-- 支持ANN近似最近邻搜索</div><p><strong>方法2：MySQL + 向量索引（MySQL 9.0+）</strong></p><div class="code-block">-- MySQL 9.0开始支持向量类型和索引</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>亿级向量毫秒级检索</li><li>以图搜图体验流畅</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例97 -->
+<div class="case-card" data-keywords="数据库 流式处理 CDC 实时同步">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">97</div>
+<div class="case-title-wrap"><div class="case-title">CDC实时数据同步架构</div><div class="case-subtitle">数据管道 — MySQL到数据仓库</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>MySQL数据需要实时同步到ClickHouse、ES、Redis等多个下游。</p></div>
+<div class="content-block"><h4>🔍 方案对比</h4><ul><li>Canal：阿里开源，成熟稳定</li><li>Debezium：RedHat开源，Kafka生态</li><li>Flink CDC：实时计算一体化</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：Flink CDC（推荐）</strong></p><div class="code-block">-- 统一采集binlog
+-- 分发到多个sink（ClickHouse/ES/Kafka）</div><p><strong>方法2：Canal + Kafka</strong></p><div class="code-block">-- Canal采集 -> Kafka -> 各消费者</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>秒级数据同步延迟</li><li>一份数据多处使用</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例98 -->
+<div class="case-card" data-keywords="数据库 Serverless 弹性 无服务器">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">98</div>
+<div class="case-title-wrap"><div class="case-title">Serverless数据库的弹性优化</div><div class="case-subtitle">成本优化 — 按需付费的数据库</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>业务流量波动大，低峰期闲置，希望数据库按实际使用付费。</p></div>
+<div class="content-block"><h4>🔍 方案</h4><ul><li>阿里云PolarDB Serverless</li><li>AWS Aurora Serverless</li><li>自动扩缩容，按CPU/内存使用量计费</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：Serverless数据库（推荐）</strong></p><div class="code-block">-- 自动从0.5核扩容到32核
+-- 低峰期自动缩容到最低配置</div><p><strong>方法2：定时扩缩容</strong></p><div class="code-block">-- 非Serverless时，定时任务调整配置</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>数据库成本降低60%</li><li>无需人工扩容</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例99 -->
+<div class="case-card" data-keywords="数据库 国产化 信创 替换">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">99</div>
+<div class="case-title-wrap"><div class="case-title">MySQL国产化替代方案</div><div class="case-subtitle">信创 — 国产数据库选型与迁移</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>政策要求使用国产数据库，需要将MySQL迁移到达梦/人大金仓/OceanBase。</p></div>
+<div class="content-block"><h4>🔍 国产数据库对比</h4><ul><li>OceanBase：兼容MySQL，分布式，阿里系</li><li>TiDB：兼容MySQL，开源社区活跃</li><li>达梦：传统国产数据库，兼容Oracle</li><li>人大金仓：PostgreSQL系</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：OceanBase/TiDB（推荐，MySQL兼容）</strong></p><div class="code-block">-- 语法兼容度高
+-- 迁移成本低</div><p><strong>方法2：双轨并行</strong></p><div class="code-block">-- 新系统用国产库
+-- 旧系统逐步迁移</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>满足信创合规要求</li><li>部分场景性能优于MySQL</li></ul></div>
+</div></div>
+</div>
+
+<!-- 案例100 -->
+<div class="case-card" data-keywords="数据库 综合优化 全链路 体系">
+<div class="case-header" onclick="toggleCase(this)">
+<div class="case-number case-num-hard">100</div>
+<div class="case-title-wrap"><div class="case-title">SQL优化体系化建设</div><div class="case-subtitle">团队能力 — 从被动救火到主动预防</div></div>
+<span class="case-level level-hard">高难</span><span class="case-toggle">▶</span>
+</div>
+<div class="case-body"><div class="case-content">
+<div class="content-block"><h4>📋 业务场景</h4><p>公司数据库问题频发，希望建立体系化的SQL优化能力。</p></div>
+<div class="content-block"><h4>🔍 体系化建设内容</h4><ul><li>规范：SQL编写规范、索引设计规范</li><li>审核：上线前SQL审核（Yearning）</li><li>监控：慢查询监控、性能基线</li><li>优化：定期巡检、性能优化专项</li><li>培训：团队SQL优化能力培养</li></ul></div>
+<div class="content-block"><h4>✅ 解决方法</h4><p><strong>方法1：建立SQL优化体系（推荐）</strong></p><div class="code-block">-- 1. 制定SQL编写规范
+-- 2. 上线前强制SQL审核
+-- 3. 生产环境慢查询自动告警
+-- 4. 月度性能巡检
+-- 5. 季度优化专项</div><p><strong>方法2：引入数据库专家</strong></p><div class="code-block">-- 聘请DBA或数据库架构师
+-- 建立专业团队</div></div>
+<div class="content-block"><h4>📊 优化效果</h4><ul><li>线上慢SQL减少95%</li><li>数据库故障减少80%</li><li>团队自驱动优化</li></ul></div>
+</div></div>
+</div>
+
+</div>
+</div>
+
+<div class="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})">↑</div>
+
+<script>
+function toggleCase(header) {
+    const card = header.parentElement;
+    const body = card.querySelector('.case-body');
+    const toggle = header.querySelector('.case-toggle');
+    const isOpen = body.classList.contains('open');
+    if (isOpen) {
+        body.classList.remove('open');
+        toggle.classList.remove('open');
+    } else {
+        body.classList.add('open');
+        toggle.classList.add('open');
+    }
+}
+
+function scrollToSection(id) {
+    const el = document.getElementById(id);
+    if (el) {
+        const y = el.getBoundingClientRect().top + window.pageYOffset - 100;
+        window.scrollTo({top: y, behavior: 'smooth'});
+    }
+    document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+    event.target.closest('.nav-item').classList.add('active');
+}
+
+const searchInput = document.getElementById('searchInput');
+searchInput.addEventListener('input', function() {
+    const keyword = this.value.toLowerCase();
+    const cards = document.querySelectorAll('.case-card');
+    let hasResult = false;
+    cards.forEach(card => {
+        const text = card.innerText.toLowerCase();
+        const keywords = card.getAttribute('data-keywords') || '';
+        if (text.includes(keyword) || keywords.includes(keyword)) {
+            card.style.display = '';
+            hasResult = true;
+        } else {
+            card.style.display = 'none';
+        }
+    });
+    const existingNoResult = document.querySelector('.no-result');
+    if (existingNoResult) existingNoResult.remove();
+    if (!hasResult && keyword) {
+        const noResult = document.createElement('div');
+        noResult.className = 'no-result';
+        noResult.innerHTML = '<p>没有找到匹配的案例，请尝试其他关键词</p>';
+        document.getElementById('contentArea').appendChild(noResult);
+    }
+});
+
+let activeNav = null;
+window.addEventListener('scroll', () => {
+    const sections = ['easy', 'medium', 'hard'];
+    let current = '';
+    sections.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.getBoundingClientRect().top <= 120) {
+            current = id;
+        }
+    });
+    if (current && activeNav !== current) {
+        activeNav = current;
+        document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
+        const navItems = document.querySelectorAll('.nav-item');
+        if (current === 'easy') navItems[0]?.classList.add('active');
+        if (current === 'medium') navItems[1]?.classList.add('active');
+        if (current === 'hard') navItems[2]?.classList.add('active');
+    }
+});
+</script>
+</body>
+</html>
